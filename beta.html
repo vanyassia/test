@@ -11,7 +11,10 @@
             --starlight-blue: #e0f4ff;
             --quantum-gold: linear-gradient(135deg, #ffd700 0%, #c5a642 100%);
             --nebula-purple: linear-gradient(45deg, #7F00FF, #E100FF);
-            --transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+            --button-red: rgba(255, 0, 85, 0.3);
+            --button-blue: rgba(0, 102, 255, 0.3);
+            --border-color: rgba(255, 255, 255, 0.15);
+            --transition: all 0.3s ease-in-out;
         }
 
         * {
@@ -28,28 +31,116 @@
             min-height: 100vh;
         }
 
+        /* Навигация */
         nav {
-            position: absolute;
+            position: fixed;
             top: 0;
+            left: 0;
             width: 100%;
-            padding: 1.5rem 4rem;
+            padding: 1rem 4rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
             background: rgba(10, 10, 26, 0.8);
             backdrop-filter: blur(12px);
             z-index: 1000;
-            border-bottom: 1px solid rgba(255, 215, 0, 0.1);
+            border-bottom: 1px solid var(--border-color);
         }
 
         .logo {
-            font-size: 2rem;
-            background: var(--quantum-gold);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            font-size: 1.8rem;
             font-weight: 700;
+            color: var(--starlight-blue);
         }
 
+        .menu {
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+        }
+
+        .menu a {
+            text-decoration: none;
+            color: var(--starlight-blue);
+            font-size: 1rem;
+            transition: var(--transition);
+            position: relative;
+        }
+
+        .menu a:hover {
+            color: #ffffff;
+        }
+
+        .menu a::after {
+            content: "";
+            position: absolute;
+            left: 50%;
+            bottom: -4px;
+            width: 0;
+            height: 2px;
+            background: var(--quantum-gold);
+            transition: var(--transition);
+            transform: translateX(-50%);
+        }
+
+        .menu a:hover::after {
+            width: 100%;
+        }
+
+        /* Кнопки */
+        .button {
+            padding: 0.6rem 1.2rem;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 500;
+            text-decoration: none;
+            transition: var(--transition);
+            border: 1px solid var(--border-color);
+            backdrop-filter: blur(10px);
+            cursor: pointer;
+        }
+
+        .contact {
+            background: var(--button-red);
+            color: #ff4b7b;
+        }
+
+        .contact:hover {
+            background: rgba(255, 0, 85, 0.5);
+            box-shadow: 0 4px 15px rgba(255, 0, 85, 0.3);
+        }
+
+        .location {
+            background: var(--button-blue);
+            color: #66b3ff;
+        }
+
+        .location:hover {
+            background: rgba(0, 102, 255, 0.5);
+            box-shadow: 0 4px 15px rgba(0, 102, 255, 0.3);
+        }
+
+        /* Адаптивность */
+        @media (max-width: 768px) {
+            nav {
+                padding: 1rem 2rem;
+            }
+
+            .menu {
+                gap: 1rem;
+            }
+
+            .menu a {
+                font-size: 0.9rem;
+            }
+
+            .button {
+                padding: 0.5rem 1rem;
+                font-size: 0.9rem;
+            }
+        }
+
+        /* Остальные стили */
         canvas.universe {
             position: fixed;
             width: 100vw;
@@ -132,10 +223,6 @@
             h1 {
                 font-size: 2.5rem;
                 margin-bottom: 2rem;
-            }
-
-            nav {
-                padding: 1rem 2rem;
             }
 
             .download-buttons {
@@ -222,6 +309,14 @@
     <canvas id="particles" class="universe"></canvas>
     <nav>
         <div class="logo">BANYA</div>
+        <div class="menu">
+            <a href="#">Hotlines</a>
+            <a href="#">Captian</a>
+            <a href="#">Fullit</a>
+            <a href="#">Patp</a>
+            <a href="#" class="button contact">Contact</a>
+            <a href="#" class="button location">Location</a>
+        </div>
     </nav>
 
     <section class="hero">
