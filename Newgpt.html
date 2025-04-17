@@ -2,185 +2,208 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>MultiTool — современный веб‑приложение</title>
-  <!-- Шрифты и иконки -->
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>MultiTool — современный веб‑инструмент</title>
+
+  <!-- Шрифты -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-  <!-- AOS для анимаций при скролле -->
+
+  <!-- AOS анимации -->
   <link href="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.css" rel="stylesheet"/>
 
+  <!-- Three.js для 3D -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r152/three.min.js"></script>
+
   <style>
-    /* Сброс и базовые стили */
+    /* Reset & базовые стили */
     *, *::before, *::after { box-sizing: border-box; margin:0; padding:0; }
-    html { scroll-behavior: smooth; }
+    html { scroll-behavior: smooth; font-size: 16px; }
     body {
-      font-family: 'Inter', -apple-system, system-ui, sans-serif;
-      background: #f0f2f5; color: #1c1e21;
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
       display: flex; flex-direction: column; min-height: 100vh;
+      transition: background .3s, color .3s;
     }
     a { text-decoration: none; color: inherit; }
-    button { cursor: pointer; }
 
-    /* Переменные и общие */
+    /* Цветовые палитры */
     :root {
-      --primary: #0a66c2;
-      --bg: #ffffff;
-      --bg-alt: #f7f9fa;
-      --text: #1c1e21;
-      --muted: #65676b;
-      --shadow: rgba(0,0,0,0.05);
-      --radius: 8px;
-      --gap: 1.5rem;
-      --transition: 0.3s;
+      --primary: #3A6B35;      /* натуральный зелёный */
+      --accent:  #6B5B95;      /* приглушённый пурпур */
+      --bg:      #F7F9F8;      /* светлая мята */
+      --bg-alt:  #FFFFFF;
+      --card:    #FFFFFF;
+      --text:    #1C1E21;
+      --muted:   #65676B;
+      --shadow:  rgba(0,0,0,0.04);
+      --radius:  12px;
+      --gap:     1.5rem;
+      --transition: .3s;
     }
-    .container { width: 90%; max-width: 1200px; margin: auto; }
+    [data-theme="dark"] {
+      --bg:     #121212;
+      --bg-alt: #1E1E1E;
+      --card:   #1E1E1E;
+      --text:   #E0E0E0;
+      --muted:  #A0A0A0;
+    }
+
+    /* Контейнер */
+    .container { width: 90%; max-width:1200px; margin: auto; }
 
     /* Header */
     header {
-      position: sticky; top: 0; z-index: 100;
-      background: var(--bg); box-shadow: 0 2px 4px var(--shadow);
+      position: sticky; top:0; z-index:100;
+      background: var(--bg-alt); backdrop-filter: blur(6px);
+      box-shadow: 0 2px 8px var(--shadow);
+      transition: background .3s;
     }
     .nav-bar {
-      display: flex; align-items: center; justify-content: space-between;
+      display: flex; align-items:center; justify-content:space-between;
       padding: 1rem 0;
     }
-    .logo { font-size: 1.5rem; font-weight: 600; color: var(--primary); }
-    nav.desktop { display: flex; gap: var(--gap); }
+    .logo { font-size:1.5rem; font-weight:600; color:var(--primary); }
+    nav.desktop { display:flex; gap:var(--gap); }
     nav.desktop a {
-      padding: 0.5rem 0.75rem; border-radius: var(--radius);
-      font-weight: 500; transition: background var(--transition);
+      position: relative; padding:0.5rem 0.75rem; border-radius:var(--radius);
+      font-weight:500; transition: background var(--transition);
     }
-    nav.desktop a:hover, nav.desktop a.active {
-      background: var(--bg-alt);
-    }
-    .burger { display: none; flex-direction: column; gap: 4px; }
+    nav.desktop a.active,
+    nav.desktop a:hover { background: var(--bg); }
+    .burger { display:none; flex-direction:column; gap:4px; cursor:pointer; }
     .burger div {
-      width: 25px; height: 3px; background: var(--text);
-      transition: transform var(--transition), opacity var(--transition);
+      width:24px; height:3px; background: var(--text);
+      transition: transform .3s;
     }
-    @media (max-width: 768px) {
-      nav.desktop { display: none; }
-      .burger { display: flex; }
+    @media (max-width:768px){
+      nav.desktop { display:none; }
+      .burger { display:flex; }
+      nav.mobile {
+        display:none; flex-direction:column; gap:1rem;
+        background:var(--bg-alt); padding:1rem;
+        box-shadow:0 4px 12px var(--shadow);
+      }
+      nav.mobile.show { display:flex; }
     }
-    nav.mobile {
-      display: none; flex-direction: column; gap: 1rem;
-      background: var(--bg); padding: 1rem; box-shadow: 0 4px 8px var(--shadow);
+
+    /* Dark mode toggle */
+    #themeToggle {
+      background: none; border: none; font-size:1.25rem;
+      color: var(--text); cursor:pointer; transition: color .3s;
     }
-    nav.mobile.show { display: flex; }
+    #themeToggle:hover { color: var(--primary); }
 
     /* Hero */
     .hero {
-      position: relative;
-      background: url('https://source.unsplash.com/1600x900/?technology') center/cover no-repeat;
-      color: #fff; text-align: center;
-      padding: 6rem 1rem;
+      position: relative; overflow:hidden;
+      background: var(--card);
+      border-radius:0 0 var(--radius) var(--radius);
+      margin-bottom:3rem;
     }
-    .hero::after {
-      content: ''; position: absolute; inset:0; background:rgba(0,0,0,0.5);
+    #three-canvas {
+      width:100%; height:300px; display:block;
     }
-    .hero .container { position: relative; z-index: 1; }
-    .hero h1 { font-size: 3rem; margin-bottom: 1rem; animation: fadeInDown 1s; }
-    .hero p  { font-size: 1.125rem; animation: fadeInUp 1s; }
+    .hero-content {
+      position: absolute; top:50%; left:50%;
+      transform: translate(-50%,-50%);
+      text-align:center; color: var(--text);
+      pointer-events:none;
+    }
+    .hero h1 {
+      font-size:2.5rem; margin-bottom:0.5rem;
+      animation: fadeInDown .8s both;
+    }
+    .hero p {
+      font-size:1.125rem; animation: fadeInUp .8s 0.3s both;
+    }
     @keyframes fadeInDown {
-      from { opacity:0; transform: translateY(-20px) } to { opacity:1; transform: translateY(0) }
+      from {opacity:0; transform:translate(-50%, -60%)} to {opacity:1; transform:translate(-50%,-50%)}
     }
     @keyframes fadeInUp {
-      from { opacity:0; transform: translateY(20px) } to { opacity:1; transform: translateY(0) }
+      from {opacity:0; transform:translate(-50%,-40%)} to {opacity:1; transform:translate(-50%,-50%)}
     }
 
-    /* Сетка функций */
+    /* Сетка карточек */
     .features {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-      gap: var(--gap);
-      margin: 3rem 0;
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+      gap:var(--gap); margin-bottom:3rem;
     }
     .card {
-      background: var(--bg); border-radius: var(--radius);
-      box-shadow: 0 2px 6px var(--shadow);
-      padding: 1.5rem; text-align: center;
-      transition: transform var(--transition), box-shadow var(--transition);
+      background:var(--card); border-radius:var(--radius);
+      box-shadow:0 2px 8px var(--shadow);
+      padding:1.5rem; text-align:center;
+      transition:transform var(--transition), box-shadow var(--transition);
     }
     .card:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 6px 16px var(--shadow);
+      transform:translateY(-6px);
+      box-shadow:0 8px 24px var(--shadow);
     }
-    .card i {
-      font-size: 2rem; color: var(--primary);
-      margin-bottom: 0.75rem;
-      transition: transform var(--transition);
+    .card-icon {
+      width:56px; height:56px; margin-bottom:1rem;
+      display:inline-flex; align-items:center; justify-content:center;
+      border-radius:50%; background:var(--bg-alt);
+      transition:transform var(--transition);
     }
-    .card:hover i { transform: scale(1.1); }
-    .card h3 { margin-bottom: 0.5rem; }
-    .card p  { color: var(--muted); font-size: 0.95rem; }
-    .card button {
-      margin-top: 1rem; padding: 0.6rem 1.2rem;
-      border: none; background: var(--primary); color: #fff;
-      border-radius: var(--radius); transition: background var(--transition), transform .1s;
-    }
-    .card button:active { transform: scale(0.97); }
+    .card:hover .card-icon { transform:scale(1.1); }
+    .card-icon img { width:28px; height:28px; filter: var(--icon-filter); }
+    /* иконки подстраиваются под тему */
+    [data-theme="dark"] .card-icon img { filter: invert(1); }
+    .card h3 { margin-bottom:0.5rem; }
+    .card p  { color: var(--muted); font-size:0.95rem; }
 
-    /* Разделы с формами */
-    section.form-section {
-      margin-bottom: 4rem;
-    }
+    /* Секции‑формы */
+    section.form-section { padding-bottom:4rem; }
     section.form-section h2 {
-      text-align: center; color: var(--primary);
-      margin-bottom: 2rem; position: relative;
+      text-align:center; color:var(--primary); margin-bottom:1rem;
+      position:relative; font-size:2rem;
     }
     section.form-section h2::after {
-      content: ''; display: block;
-      width: 60px; height: 3px; background: var(--primary);
-      margin: 0.5rem auto 0;
+      content:''; display:block; width:60px; height:4px; background:var(--primary);
+      margin:0.5rem auto 0;
     }
     .form-card {
-      max-width: 600px; margin: auto;
-      background: var(--bg); border-radius: var(--radius);
-      box-shadow: 0 2px 6px var(--shadow);
-      padding: 2rem;
-      opacity: 0; transform: translateY(20px);
-      transition: opacity .6s ease, transform .6s ease;
+      max-width:600px; margin:1.5rem auto 0;
+      background:var(--card); border-radius:var(--radius);
+      box-shadow:0 4px 12px var(--shadow);
+      padding:2rem; opacity:0; transform:translateY(20px);
+      transition:opacity .6s ease, transform .6s ease;
     }
-    .form-card.aos-animate {
-      opacity: 1; transform: translateY(0);
-    }
+    .form-card.aos-animate { opacity:1; transform:translateY(0); }
     .form-card label {
-      display: block; margin-top: 1rem;
-      color: var(--text);
+      display:block; margin-top:1rem; color:var(--text);
     }
     .form-card input, .form-card textarea {
-      width: 100%; padding: 0.75rem; margin-top: 0.25rem;
-      border: 1px solid #ccc; border-radius: var(--radius);
-      font-size: 1rem; transition: border-color var(--transition);
+      width:100%; padding:0.75rem; margin-top:0.25rem;
+      border:1px solid #ccc; border-radius:var(--radius);
+      font-size:1rem; transition:border-color .3s;
     }
     .form-card input:focus, .form-card textarea:focus {
-      border-color: var(--primary);
+      border-color:var(--primary);
     }
     .form-card button {
-      margin-top: 1.5rem; width: 100%;
-      padding: 0.75rem; font-size: 1rem;
-      border: none; background: var(--primary);
-      color: #fff; border-radius: var(--radius);
-      transition: background var(--transition), transform .1s;
+      margin-top:1.5rem; width:100%; padding:0.75rem;
+      font-size:1rem; border:none;
+      background:var(--primary); color:#fff;
+      border-radius:var(--radius);
+      transition:background .3s, transform .1s;
     }
-    .form-card button:active { transform: scale(0.97); }
+    .form-card button:active { transform:scale(0.97); }
     .form-card .result {
-      margin-top: 1rem; font-weight: 500;
+      margin-top:1rem; font-weight:500;
     }
 
     /* Footer */
     footer {
-      text-align: center; padding: 1.5rem 0;
-      background: var(--bg-alt); color: var(--muted);
-      font-size: 0.9rem; margin-top: auto;
+      text-align:center; padding:1.5rem 0;
+      background:var(--bg-alt); color:var(--muted);
+      font-size:0.9rem; margin-top:auto;
     }
   </style>
 </head>
 <body>
-
-  <!-- Header -->
   <header>
     <div class="container nav-bar">
       <div class="logo">MultiTool</div>
@@ -197,53 +220,32 @@
         <a href="#baseconv">Системы</a>
         <a href="#spellcheck">Проверка</a>
       </nav>
-      <div class="burger" id="burger">
-        <div></div><div></div><div></div>
-      </div>
+      <button id="themeToggle" aria-label="Переключить тему">🌙</button>
+      <div class="burger" id="burger"><div></div><div></div><div></div></div>
     </div>
     <nav class="mobile container" id="mobileNav"></nav>
   </header>
 
-  <!-- Hero -->
+  <!-- Hero с 3D‑сценой -->
   <section class="hero">
-    <div class="container">
-      <h1>MultiTool — всё в одном</h1>
-      <p>Калькулятор, игры, нейросеть, проверки — современный веб‑инструмент под рукой.</p>
+    <canvas id="three-canvas"></canvas>
+    <div class="hero-content">
+      <h1 data-aos="fade-down">Добро пожаловать, <span id="greeting">Гость</span>!</h1>
+      <p data-aos="fade-up">Самый функциональный и красивый веб‑инструмент 2025 года.</p>
     </div>
   </section>
 
   <main class="container">
-
-    <!-- Сетка функций -->
+    <!-- Карточки функций -->
     <section class="features">
-      <div class="card" data-aos="fade-up">
-        <i class="fas fa-calculator"></i>
-        <h3>Калькулятор</h3>
-        <p>Мгновенные вычисления любых выражений.</p>
-        <button onclick="scrollToSection('calculator')">Перейти</button>
-      </div>
-      <div class="card" data-aos="fade-up" data-aos-delay="100">
-        <i class="fas fa-ship"></i>
-        <h3>Морской бой</h3>
-        <p>Классика: потопи все корабли противника.</p>
-        <button onclick="scrollToSection('battleship')">Перейти</button>
-      </div>
-      <div class="card" data-aos="fade-up" data-aos-delay="200">
-        <i class="fas fa-question-circle"></i>
-        <h3>Угадайка</h3>
-        <p>Отгадай число от 1 до 100.</p>
-        <button onclick="scrollToSection('guess')">Перейти</button>
-      </div>
-      <div class="card" data-aos="fade-up" data-aos-delay="300">
-        <i class="fas fa-coins"></i>
-        <h3>Монетки</h3>
-        <p>Накопи свои виртуальные монетки.</p>
-        <button onclick="scrollToSection('coins')">Перейти</button>
-      </div>
-      <!-- Добавьте ещё карточек по аналогии -->
+      <div class="card" data-aos="fade-up"><div class="card-icon"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/javascript/javascript-original.svg" loading="lazy"></div><h3>Калькулятор</h3><p>Мгновенные вычисления любых выражений.</p><button onclick="scrollToSection('calculator')">Перейти</button></div>
+      <div class="card" data-aos="fade-up" data-aos-delay="100"><div class="card-icon"><i class="fas fa-ship"></i></div><h3>Морской бой</h3><p>Потопи все корабли противника.</p><button onclick="scrollToSection('battleship')">Перейти</button></div>
+      <div class="card" data-aos="fade-up" data-aos-delay="200"><div class="card-icon"><i class="fas fa-question-circle"></i></div><h3>Угадайка</h3><p>Отгадай число от 1 до 100.</p><button onclick="scrollToSection('guess')">Перейти</button></div>
+      <div class="card" data-aos="fade-up" data-aos-delay="300"><div class="card-icon"><i class="fas fa-coins"></i></div><h3>Монетки</h3><p>Накопи свои виртуальные монетки.</p><button onclick="scrollToSection('coins')">Перейти</button></div>
+      <!-- ... другие карточки аналогично ... -->
     </section>
 
-    <!-- Детальные секции -->
+    <!-- Детальные формы -->
     <section id="calculator" class="form-section">
       <h2 data-aos="fade-up">Калькулятор</h2>
       <div class="form-card" data-aos="fade-up" data-aos-delay="100">
@@ -254,7 +256,7 @@
     </section>
 
     <section id="battleship" class="form-section">
-      <h2 data-aos="fade-up">Морской бой</h2>
+      <h2 data-aos="fade-up">Морской бой</h2>
       <div class="form-card" data-aos="fade-up" data-aos-delay="100">
         <button onclick="startBS()">Новая игра</button>
         <div class="result" id="bsBoard"></div>
@@ -279,51 +281,70 @@
       </div>
     </section>
 
-    <!-- ... другие секции аналогично ... -->
+    <!-- ... остальные секции ... -->
 
   </main>
 
-  <footer>
-    © 2025 MultiTool — все права защищены
-  </footer>
+  <footer>© 2025 MultiTool — все права защищены</footer>
 
   <!-- Скрипты -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.min.js"></script>
   <script>
-    // Инициализация AOS
-    AOS.init({ once: true, duration: 600 });
+    // AOS
+    AOS.init({ once:true, duration:600 });
 
-    // Клонируем меню для мобильного
-    const mainNav = document.getElementById('mainNav');
-    document.getElementById('mobileNav').innerHTML = mainNav.innerHTML;
-
-    // Бургер‑меню
-    document.getElementById('burger').onclick = () => {
-      document.getElementById('mobileNav').classList.toggle('show');
-    };
-
-    // Подсветка активного пункта
-    document.querySelectorAll('nav a').forEach(a => {
-      a.addEventListener('click', e => {
-        document.querySelectorAll('nav a').forEach(x => x.classList.remove('active'));
-        e.target.classList.add('active');
-        document.getElementById('mobileNav').classList.remove('show');
-      });
+    // Мобильное меню
+    document.getElementById('mobileNav').innerHTML = document.getElementById('mainNav').innerHTML;
+    document.getElementById('burger').onclick = () => document.getElementById('mobileNav').classList.toggle('show');
+    document.querySelectorAll('nav a').forEach(a => a.onclick = e => {
+      document.querySelectorAll('nav a').forEach(x=>x.classList.remove('active'));
+      e.target.classList.add('active');
+      document.getElementById('mobileNav').classList.remove('show');
     });
 
-    // Плавный скролл
-    function scrollToSection(id) {
-      document.getElementById(id).scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+    // Dark/Light toggle
+    const toggle = document.getElementById('themeToggle');
+    const theme = localStorage.getItem('theme')
+      || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    document.documentElement.setAttribute('data-theme', theme);
+    toggle.textContent = theme==='dark' ? '☀️' : '🌙';
+    toggle.onclick = () => {
+      const next = document.documentElement.getAttribute('data-theme')==='dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      localStorage.setItem('theme', next);
+      toggle.textContent = next==='dark' ? '☀️' : '🌙';
+    };
 
-    // Функции (пример: калькулятор и морской бой)
+    // Персонализация по времени
+    const hour = new Date().getHours();
+    let greet = 'Гость';
+    if (hour < 6)      greet = 'Ночной гость';
+    else if (hour < 12) greet = 'Доброе утро';
+    else if (hour < 18) greet = 'Добрый день';
+    else                greet = 'Добрый вечер';
+    document.getElementById('greeting').textContent = greet;
+
+    // 3D‑сцена на Three.js
+    const canvas = document.getElementById('three-canvas'),
+          scene = new THREE.Scene(),
+          cam = new THREE.PerspectiveCamera(45, canvas.clientWidth/canvas.clientHeight, 0.1, 100),
+          renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:true});
+    renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+    cam.position.z = 3;
+    const geo = new THREE.TorusKnotGeometry(0.7, 0.2, 100, 16),
+          mat = new THREE.MeshStandardMaterial({color:0x6B5B95, metalness:0.3, roughness:0.7}),
+          knot = new THREE.Mesh(geo, mat);
+    scene.add(knot, new THREE.AmbientLight(0xFFFFFF, 0.6), new THREE.DirectionalLight(0xFFFFFF, 0.6));
+    function animate3D(){ requestAnimationFrame(animate3D); knot.rotation.x += 0.005; knot.rotation.y += 0.007; renderer.render(scene, cam); }
+    animate3D();
+
+    // Утилиты функционала (calc, battleship, guess, coins)...
+    function scrollToSection(id){ document.getElementById(id).scrollIntoView({behavior:'smooth'}); }
     function doCalc(){
       const e = document.getElementById('calcExpr').value;
-      try { const r = math.evaluate(e); document.getElementById('calcRes').textContent = `${e} = ${r}`; }
-      catch(err){ document.getElementById('calcRes').textContent = 'Ошибка'; }
+      try{ document.getElementById('calcRes').textContent = `${e} = ${math.evaluate(e)}`; }
+      catch{ document.getElementById('calcRes').textContent = 'Ошибка'; }
     }
-
     let bsField, bsShips;
     function startBS(){
       bsField = Array.from({length:5},()=>Array(5).fill('O'));
@@ -331,30 +352,27 @@
       renderBS();
     }
     function renderBS(){
-      const c = document.getElementById('bsBoard'); let html='<table>';
-      bsField.forEach((r,i)=>{ html+='<tr>'; r.forEach((v,j)=>{
-        html+=`<td><button onclick="clickBS(${i},${j})">${v}</button></td>`;
-      }); html+='</tr>'; }); html+='</table>'; c.innerHTML=html;
+      const b = document.getElementById('bsBoard'), t=['<table>'];
+      bsField.forEach((r,i)=>{ t.push('<tr>'); r.forEach((v,j)=> t.push(`<td><button onclick="clickBS(${i},${j})">${v}</button></td>`)); t.push('</tr>');});
+      b.innerHTML = t.join('') + '</table>';
     }
     function clickBS(i,j){
-      const k=`${i},${j}`; if(bsShips.has(k)){ bsField[i][j]='✖'; bsShips.delete(k);} else bsField[i][j]='−'; renderBS();
-      if(!bsShips.size) setTimeout(()=>alert('Победа! 🎉'),100);
+      const k=`${i},${j}`; bsField[i][j] = bsShips.has(k)? '✖': '−';
+      bsShips.has(k) && bsShips.delete(k); renderBS();
+      if (!bsShips.size) setTimeout(()=>alert('Победа! 🎉'),100);
     }
-
     let secret;
-    function startGuess(){ secret = rand(100)+1; document.getElementById('guessRes').textContent='Угадайте!'; }
+    function startGuess(){ secret=rand(100)+1; document.getElementById('guessRes').textContent='Угадайте!'; }
     function checkGuess(){
       const n=+document.getElementById('guessNum').value;
-      let m = n<secret?'Больше':n>secret?'Меньше':'Угадали! 🎉';
-      document.getElementById('guessRes').textContent = m;
+      document.getElementById('guessRes').textContent = n<secret? 'Больше': n>secret? 'Меньше': 'Угадали! 🎉';
     }
-
     function showCoins(){
       let c=+localStorage.coins||0, d=rand(10); c+=d; localStorage.coins=c;
-      document.getElementById('coinsRes').textContent=`У вас ${c} монеток (+${d})`;
+      document.getElementById('coinsRes').textContent = `У вас ${c} монеток (+${d})`;
     }
-
     function rand(n){ return Math.floor(Math.random()*n); }
   </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.min.js"></script>
 </body>
 </html>
