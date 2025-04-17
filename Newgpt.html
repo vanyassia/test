@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>MultiTool — современный веб‑инструмент</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <!-- AOS CSS -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.css" rel="stylesheet"/>
+
+  <!-- Font Awesome 6 Free -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet"/>
+
+  <!-- Three.js для 3D-сцены -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r152/three.min.js"></script>
+  <!-- Math.js для калькулятора -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.min.js"></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin:0; padding:0; }
+    html { scroll-behavior: smooth; font-size:16px; }
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex; flex-direction: column; min-height: 100vh;
+      transition: background .3s, color .3s;
+    }
+    a { text-decoration: none; color: inherit; }
+    button { cursor: pointer; }
+
+    :root {
+      --primary: #3A6B35;
+      --bg:      #F7F9F8;
+      --bg-alt:  #FFFFFF;
+      --card:    #FFFFFF;
+      --text:    #1C1E21;
+      --muted:   #65676B;
+      --shadow:  rgba(0,0,0,0.04);
+      --radius:  12px;
+      --gap:     1.5rem;
+      --transition: .3s;
+    }
+    [data-theme="dark"] {
+      --bg:     #121212;
+      --bg-alt: #1E1E1E;
+      --card:   #1E1E1E;
+      --text:   #E0E0E0;
+      --muted:  #A0A0A0;
+    }
+
+    .container { width:90%; max-width:1200px; margin:auto; }
+
+    header {
+      position: sticky; top:0; z-index:100;
+      background: var(--bg-alt); backdrop-filter: blur(6px);
+      box-shadow: 0 2px 8px var(--shadow);
+    }
+    .nav-bar {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:1rem 0;
+    }
+    .logo { font-size:1.5rem; font-weight:600; color:var(--primary); }
+    nav.desktop { display:flex; gap:var(--gap); }
+    nav.desktop a {
+      padding:.5rem .75rem; border-radius:var(--radius);
+      font-weight:500; transition:background var(--transition);
+    }
+    nav.desktop a:hover, nav.desktop a.active { background: var(--bg); }
+    .burger { display:none; flex-direction:column; gap:4px; cursor:pointer; }
+    .burger div { width:24px; height:3px; background:var(--text); transition:transform .3s; }
+    @media (max-width:768px) {
+      nav.desktop { display:none; }
+      .burger { display:flex; }
+      nav.mobile {
+        display:none; flex-direction:column; gap:1rem;
+        background:var(--bg-alt); padding:1rem;
+        box-shadow:0 4px 12px var(--shadow);
+      }
+      nav.mobile.show { display:flex; }
+    }
+
+    #themeToggle {
+      background:none; border:none; font-size:1.25rem;
+      color:var(--text); transition:color .3s;
+    }
+    #themeToggle:hover { color:var(--primary); }
+
+    .hero {
+      position:relative; overflow:hidden;
+      background:var(--card); border-radius:0 0 var(--radius) var(--radius);
+      margin-bottom:3rem;
+    }
+    #three-canvas { width:100%; height:300px; display:block; }
+    .hero-content {
+      position:absolute; top:50%; left:50%;
+      transform:translate(-50%,-50%); text-align:center;
+      pointer-events:none;
+    }
+    .hero h1 {
+      font-size:2.5rem; margin-bottom:.5rem;
+      animation:fadeInDown .8s both;
+    }
+    .hero p {
+      font-size:1.125rem; animation:fadeInUp .8s .3s both;
+    }
+    @keyframes fadeInDown {
+      from { opacity:0; transform:translate(-50%,-60%) } to { opacity:1; transform:translate(-50%,-50%) }
+    }
+    @keyframes fadeInUp {
+      from { opacity:0; transform:translate(-50%,-40%) } to { opacity:1; transform:translate(-50%,-50%) }
+    }
+
+    .features {
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+      gap:var(--gap); margin-bottom:3rem;
+    }
+    .card {
+      background:var(--card); border-radius:var(--radius);
+      box-shadow:0 2px 8px var(--shadow);
+      padding:1.5rem; text-align:center;
+      transition:transform var(--transition), box-shadow var(--transition);
+    }
+    .card:hover {
+      transform:translateY(-6px);
+      box-shadow:0 8px 24px var(--shadow);
+    }
+    .card-icon {
+      width:56px; height:56px; margin-bottom:1rem;
+      display:inline-flex; align-items:center; justify-content:center;
+      border-radius:50%; background:var(--bg-alt);
+      transition:transform var(--transition);
+    }
+    .card:hover .card-icon { transform:scale(1.1); }
+    .card-icon img, .card-icon i {
+      font-size:1.5rem; color:var(--primary);
+    }
+    .card h3 { margin-bottom:.5rem; }
+    .card p { color:var(--muted); font-size:.95rem; }
+
+    section.form-section { padding-bottom:4rem; }
+    section.form-section h2 {
+      text-align:center; color:var(--primary);
+      margin-bottom:1rem; position:relative; font-size:2rem;
+    }
+    section.form-section h2::after {
+      content:''; display:block; width:60px; height:4px;
+      background:var(--primary); margin:.5rem auto 0;
+    }
+    .form-card {
+      max-width:600px; margin:1.5rem auto 0;
+      background:var(--card); border-radius:var(--radius);
+      box-shadow:0 4px 12px var(--shadow);
+      padding:2rem; opacity:0; transform:translateY(20px);
+      transition:opacity .6s ease, transform .6s ease;
+    }
+    .form-card.aos-animate { opacity:1; transform:translateY(0); }
+    .form-card label {
+      display:block; margin-top:1rem; color:var(--text);
+    }
+    .form-card input, .form-card textarea {
+      width:100%; padding:.75rem; margin-top:.25rem;
+      border:1px solid #ccc; border-radius:var(--radius);
+      transition:border-color .3s;
+    }
+    .form-card input:focus, .form-card textarea:focus {
+      border-color:var(--primary);
+    }
+    .form-card button {
+      margin-top:1.5rem; width:100%; padding:.75rem; font-size:1rem;
+      border:none; background:var(--primary); color:#fff;
+      border-radius:var(--radius); transition:transform .1s;
+    }
+    .form-card button:active { transform:scale(0.97); }
+    .form-card .result { margin-top:1rem; font-weight:500; }
+
+    footer {
+      text-align:center; padding:1.5rem 0;
+      background:var(--bg-alt); color:var(--muted);
+      font-size:.9rem; margin-top:auto;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container nav-bar">
+      <div class="logo">MultiTool</div>
+      <nav class="desktop" id="mainNav">
+        <a href="#calculator" class="active">Калькулятор</a>
+        <a href="#battleship">Морской бой</a>
+        <a href="#guess">Угадайка</a>
+        <a href="#coins">Монетки</a>
+      </nav>
+      <button id="themeToggle" aria-label="Переключить тему">🌙</button>
+      <div class="burger" id="burger"><div></div><div></div><div></div></div>
+    </div>
+    <nav class="mobile container" id="mobileNav"></nav>
+  </header>
+
+  <section class="hero">
+    <canvas id="three-canvas"></canvas>
+    <div class="hero-content">
+      <h1 data-aos="fade-down">Добро пожаловать, <span id="greeting">Гость</span>!</h1>
+      <p data-aos="fade-up">Самый функциональный и красивый веб‑инструмент 2025 года.</p>
+    </div>
+  </section>
+
+  <main class="container">
+    <section class="features">
+      <div class="card" data-aos="fade-up">
+        <div class="card-icon"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/javascript/javascript-original.svg" loading="lazy"></div>
+        <h3>Калькулятор</h3>
+        <p>Мгновенные вычисления любых выражений.</p>
+        <button onclick="scrollToSection('calculator')">Перейти</button>
+      </div>
+      <div class="card" data-aos="fade-up" data-aos-delay="100">
+        <div class="card-icon"><i class="fa-solid fa-ship"></i></div>
+        <h3>Морской бой</h3>
+        <p>Потопи все корабли противника.</p>
+        <button onclick="scrollToSection('battleship')">Перейти</button>
+      </div>
+      <div class="card" data-aos="fade-up" data-aos-delay="200">
+        <div class="card-icon"><i class="fa-solid fa-question-circle"></i></div>
+        <h3>Угадайка</h3>
+        <p>Отгадай число от 1 до 100.</p>
+        <button onclick="scrollToSection('guess')">Перейти</button>
+      </div>
+      <div class="card" data-aos="fade-up" data-aos-delay="300">
+        <div class="card-icon"><i class="fa-solid fa-coins"></i></div>
+        <h3>Монетки</h3>
+        <p>Накопи свои виртуальные монетки.</p>
+        <button onclick="scrollToSection('coins')">Перейти</button>
+      </div>
+    </section>
+
+    <section id="calculator" class="form-section">
+      <h2 data-aos="fade-up">Калькулятор</h2>
+      <div class="form-card" data-aos="fade-up" data-aos-delay="100">
+        <input id="calcExpr" placeholder="2+3*4">
+        <button onclick="doCalc()">Вычислить</button>
+        <div class="result" id="calcRes"></div>
+      </div>
+    </section>
+
+    <section id="battleship" class="form-section">
+      <h2 data-aos="fade-up">Морской бой</h2>
+      <div class="form-card" data-aos="fade-up" data-aos-delay="100">
+        <button onclick="startBS()">Новая игра</button>
+        <div class="result" id="bsBoard"></div>
+      </div>
+    </section>
+
+    <section id="guess" class="form-section">
+      <h2 data-aos="fade-up">Угадайка</h2>
+      <div class="form-card" data-aos="fade-up" data-aos-delay="100">
+        <button onclick="startGuess()">Загадать</button>
+        <input type="number" id="guessNum">
+        <button onclick="checkGuess()">Проверить</button>
+        <div class="result" id="guessRes"></div>
+      </div>
+    </section>
+
+    <section id="coins" class="form-section">
+      <h2 data-aos="fade-up">Монетки</h2>
+      <div class="form-card" data-aos="fade-up" data-aos-delay="100">
+        <button onclick="showCoins()">Получить монетки</button>
+        <div class="result" id="coinsRes"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer>© 2025 MultiTool — все права защищены</footer>
+
+  <!-- AOS and scripts -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.js"></script>
+  <script>
+    AOS.init({ once:true, duration:600 });
+
+    document.getElementById('mobileNav').innerHTML =
+      document.getElementById('mainNav').innerHTML;
+
+    document.getElementById('burger').onclick = () =>
+      document.getElementById('mobileNav').classList.toggle('show');
+
+    document.querySelectorAll('nav a').forEach(a => {
+      a.onclick = e => {
+        document.querySelectorAll('nav a').forEach(x=>x.classList.remove('active'));
+        e.target.classList.add('active');
+        document.getElementById('mobileNav').classList.remove('show');
+      };
+    });
+
+    const toggle = document.getElementById('themeToggle');
+    const saved = localStorage.getItem('theme');
+    const prefers = window.matchMedia('(prefers-color-scheme:dark)').matches ? 'dark' : 'light';
+    let theme = saved || prefers;
+    document.documentElement.setAttribute('data-theme', theme);
+    toggle.textContent = theme==='dark' ? '☀️' : '🌙';
+    toggle.onclick = () => {
+      theme = theme==='dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', theme);
+      localStorage.setItem('theme', theme);
+      toggle.textContent = theme==='dark' ? '☀️' : '🌙';
+    };
+
+    const h = new Date().getHours();
+    let g = 'Гость';
+    if (h<6)       g='Ночной гость';
+    else if (h<12) g='Доброе утро';
+    else if (h<18) g='Добрый день';
+    else           g='Добрый вечер';
+    document.getElementById('greeting').textContent = g;
+
+    // 3D-scene
+    const canvas = document.getElementById('three-canvas'),
+          scene = new THREE.Scene(),
+          camera = new THREE.PerspectiveCamera(45, canvas.clientWidth/canvas.clientHeight, 0.1, 100),
+          renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:true});
+    renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+    camera.position.z = 3;
+    const geo = new THREE.TorusKnotGeometry(0.7,0.2,100,16),
+          mat = new THREE.MeshStandardMaterial({color:0x6B5B95, metalness:0.3, roughness:0.7}),
+          knot = new THREE.Mesh(geo, mat);
+    scene.add(knot, new THREE.AmbientLight(0xFFFFFF, 0.6), new THREE.DirectionalLight(0xFFFFFF, 0.6));
+    (function animate(){
+      requestAnimationFrame(animate);
+      knot.rotation.x += 0.005;
+      knot.rotation.y += 0.007;
+      renderer.render(scene, camera);
+    })();
+
+    function scrollToSection(id){
+      document.getElementById(id).scrollIntoView({behavior:'smooth'});
+    }
+    function doCalc(){
+      const e = document.getElementById('calcExpr').value;
+      try { document.getElementById('calcRes').textContent = `${e} = ${math.evaluate(e)}`; }
+      catch { document.getElementById('calcRes').textContent = 'Ошибка'; }
+    }
+    let bsField, bsShips;
+    function startBS(){
+      bsField = Array.from({length:5},()=>Array(5).fill('O'));
+      bsShips = new Set();
+      while(bsShips.size<3) bsShips.add(`${rand(5)},${rand(5)}`);
+      renderBS();
+    }
+    function renderBS(){
+      const b = document.getElementById('bsBoard');
+      let html = '<table>';
+      bsField.forEach((row,i)=>{
+        html += '<tr>';
+        row.forEach((c,j)=> html += `<td><button onclick="clickBS(${i},${j})">${c}</button></td>`);
+        html += '</tr>';
+      });
+      html += '</table>';
+      b.innerHTML = html;
+    }
+    function clickBS(i,j){
+      const key = `${i},${j}`;
+      bsField[i][j] = bsShips.has(key) ? '✖' : '−';
+      if (bsShips.has(key)) bsShips.delete(key);
+      renderBS();
+      if (!bsShips.size) setTimeout(()=>alert('Победа! 🎉'),100);
+    }
+    let secret;
+    function startGuess(){
+      secret = rand(100)+1;
+      document.getElementById('guessRes').textContent = 'Угадайте!';
+    }
+    function checkGuess(){
+      const n = +document.getElementById('guessNum').value;
+      document.getElementById('guessRes').textContent =
+        n<secret ? 'Больше' : n>secret ? 'Меньше' : 'Угадали! 🎉';
+    }
+    function showCoins(){
+      let c = +localStorage.coins||0, d = rand(10);
+      c += d; localStorage.coins = c;
+      document.getElementById('coinsRes').textContent = `У вас ${c} монеток (+${d})`;
+    }
+    function rand(n){ return Math.floor(Math.random()*n); }
+  </script>
+</body>
+</html>
