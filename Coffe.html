@@ -1,337 +1,820 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html lang="ru" data-theme="dark">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Coffee Shop</title>
-  
-  <!-- Пример подключения Google Fonts (Playfair Display и Roboto) -->
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Roboto&display=swap" rel="stylesheet">
-  
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>SYNPHORIA — Power Up Your Productivity</title>
+
+  <!-- Fonts (Google) -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Plus+Jakarta+Sans:wght@600;700&family=Space+Grotesk:wght@300;500;700&display=swap" rel="stylesheet">
+
+  <meta name="description" content="SYNPHORIA — набор инструментов для повышения продуктивности. Адаптивный современный интерфейс, 3D-обзор, встроенный калькулятор и коллекция программ.">
+
   <style>
-    /* ========== Сброс стилей (если нужно) ========== */
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
+    /* ==========================
+       Variables & Reset
+       ========================== */
+    :root{
+      --bg-dark:#070716;
+      --bg-panel: rgba(255,255,255,0.04);
+      --text-light:#e6f6ff;
+      --muted: rgba(230,246,255,0.7);
+      --accent-1: #e100ff;
+      --accent-2: #ffd700;
+      --accent-grad: linear-gradient(135deg,var(--accent-1),#6a11cb 40%,var(--accent-2));
+      --glass: rgba(255,255,255,0.04);
+      --border: rgba(255,255,255,0.08);
+      --radius: 14px;
+      --transition: 280ms cubic-bezier(.2,.9,.25,1);
+      --max-width: 1150px;
+      --shadow: 0 10px 30px rgba(12,10,20,0.6);
+      --particle-color: rgba(255,255,255,0.9);
+      --button-pad: 12px 22px;
+      --reduced-motion: 0;
     }
 
-    /* ========== Базовые стили ========== */
-    body {
-      font-family: 'Roboto', sans-serif;
-      background-color: #EDE3D0; /* общий фон */
-      color: #333;
+    @media (prefers-reduced-motion: reduce){
+      :root{ --reduced-motion: 1; }
     }
 
-    img {
-      max-width: 100%;
-      height: auto;
-      display: block;
+    [data-theme="light"]{
+      --bg-dark: #f7f8fb;
+      --bg-panel: rgba(0,0,0,0.03);
+      --text-light:#0b1620;
+      --muted: rgba(11,22,32,0.7);
+      --glass: rgba(0,0,0,0.04);
+      --border: rgba(11,22,32,0.06);
+      --shadow: 0 8px 30px rgba(13,13,20,0.06);
+      --particle-color: rgba(10,20,30,0.14);
     }
 
-    a {
-      text-decoration: none;
-      cursor: pointer;
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family:Inter, "Space Grotesk", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      background:linear-gradient(180deg, var(--bg-dark) 0%, rgba(10,10,20,0.95) 100%);
+      color:var(--text-light);
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+      line-height:1.45;
+      overflow-x:hidden;
+      transition: background 0.4s ease, color 0.3s ease;
+      padding-bottom:80px;
     }
 
-    /* Контейнер для центрирования и ограничения ширины */
-    .container {
-      width: 1200px;
-      max-width: 90%;
-      margin: 0 auto;
+    a{color:inherit;text-decoration:none}
+    img{max-width:100%;display:block}
+
+    .container{
+      width:100%;
+      max-width:var(--max-width);
+      margin:0 auto;
+      padding: 0 20px;
     }
 
-    /* ========== ШАПКА (header) ========== */
-    .header {
-      background-color: #C7A57B; 
-      padding: 1rem 0;
+    /* ==========================
+       Top Nav
+       ========================== */
+    nav{
+      position:fixed;
+      left:0;right:0;top:12px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:16px;
+      padding:10px 18px;
+      z-index:1200;
+      pointer-events:auto;
     }
 
-    .header-content {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+    .nav-inner{
+      width:100%;
+      max-width:var(--max-width);
+      margin:0 auto;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
+      border-radius: 16px;
+      padding:6px 12px;
+      border:1px solid var(--border);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(8px);
     }
 
-    .logo {
-      font-family: 'Playfair Display', serif;
-      font-size: 1.8rem;
-      font-weight: 700;
-      color: #fff;
+    .brand{
+      display:flex;
+      gap:12px;
+      align-items:center;
+      font-weight:700;
+      font-family:"Plus Jakarta Sans", Inter, sans-serif;
+      letter-spacing:0.2px;
     }
 
-    .nav ul {
-      list-style: none;
-      display: flex;
-      gap: 1.5rem;
+    .logo-svg{
+      width:40px;height:40px;border-radius:10px;
+      display:inline-grid;place-items:center;
+      background:linear-gradient(135deg,#1f005c,#e100ff 50%, #ff8a00);
+      box-shadow:0 6px 18px rgba(225,0,255,0.12);
+      flex-shrink:0;
     }
 
-    .nav a {
-      color: #fff;
-      font-weight: 500;
-      font-size: 1rem;
-      transition: opacity 0.2s ease-in-out;
+    .brand .title{
+      font-size:1.05rem;
+      color:var(--text-light);
     }
 
-    .nav a:hover {
-      opacity: 0.8;
+    .menu{
+      display:flex;
+      gap:12px;
+      align-items:center;
     }
 
-    /* ========== ГЕРОЙ-БЛОК (hero) ========== */
- .hero {
-    position: relative;
-    width: 100%;
-    height: 100vh; /* Высота на весь экран */
-    overflow: hidden;
-}
-
-.hero img {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    object-fit: cover; /* Растягиваем с сохранением пропорций */
-    top: 0;
-    left: 0;
-}
-
-
-
-    .hero-content {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 2rem;
+    .menu a{
+      padding:8px 12px;
+      border-radius:10px;
+      font-weight:600;
+      color:var(--muted);
+      transition:all var(--transition);
+      font-size:0.95rem;
     }
 
-    .hero-text {
-      flex: 1;
+    .menu a:hover{ color:var(--text-light); transform:translateY(-3px); }
+
+    .cta{
+      display:flex;
+      gap:8px;
+      align-items:center;
     }
 
-    .hero-text h1 {
-      font-family: 'Playfair Display', serif;
-      font-size: 3rem;
-      margin-bottom: 1rem;
-      color: #4C3928;
+    .btn{
+      border:1px solid var(--border);
+      background:var(--glass);
+      padding:var(--button-pad);
+      border-radius:12px;
+      font-weight:600;
+      cursor:pointer;
+      transition:transform var(--transition), box-shadow var(--transition), background-var(--transition);
+      display:inline-flex;
+      align-items:center;
+      gap:10px;
     }
 
-    .hero-text p {
-      font-size: 1.2rem;
-      margin-bottom: 1.5rem;
-      color: #555;
+    .btn.primary{
+      background: var(--accent-grad);
+      color:white;
+      box-shadow:0 10px 30px rgba(127,0,255,0.18);
+      border:none;
     }
 
-    /* Кнопки */
-    .btn {
-      display: inline-block;
-      padding: 0.75rem 1.5rem;
-      border-radius: 4px;
-      font-weight: 600;
-      transition: background-color 0.3s, color 0.3s;
+    .theme-toggle{
+      display:inline-grid;
+      place-items:center;
+      width:44px;height:44px;border-radius:10px;
+      background:var(--glass);
+      border:1px solid var(--border);
+      cursor:pointer;
     }
 
-    .primary-btn {
-      background-color: #C7A57B;
-      color: #fff;
-    }
-    .primary-btn:hover {
-      background-color: #b08f68;
-    }
-
-    .secondary-btn {
-      background-color: #4C3928;
-      color: #fff;
-    }
-    .secondary-btn:hover {
-      background-color: #3c2d20;
+    /* Hamburger for mobile */
+    .hamburger{
+      display:none;
+      width:44px;height:44px;border-radius:10px;
+      background:var(--glass);
+      border:1px solid var(--border);
+      align-items:center;justify-content:center;
+      cursor:pointer;
     }
 
-    /* Картинка справа */
-    .hero-image {
-      flex: 1;
-      text-align: right;
+    .hamburger .lines{
+      width:18px;height:14px;position:relative;
+    }
+    .hamburger .lines span{
+      position:absolute;left:0;right:0;height:2px;background:var(--text-light);
+      transition:all 220ms ease;
+      border-radius:2px;
+    }
+    .hamburger .lines span:nth-child(1){top:0}
+    .hamburger .lines span:nth-child(2){top:6px}
+    .hamburger .lines span:nth-child(3){top:12px}
+
+    /* Mobile menu panel */
+    .mobile-panel{
+      position:fixed;inset:0;background:linear-gradient(180deg, rgba(2,2,6,0.9), rgba(2,2,6,0.95));
+      transform:translateX(110%);transition:transform 360ms cubic-bezier(.2,.9,.3,1);
+      z-index:1300;padding:70px 20px 30px;
+      display:flex;flex-direction:column;gap:18px;
+    }
+    .mobile-panel.open{ transform:translateX(0); }
+    .mobile-panel a{ padding:14px;border-radius:12px;background:rgba(255,255,255,0.02); color:var(--muted); font-weight:700 }
+
+    /* ==========================
+       Hero
+       ========================== */
+    header.hero{
+      min-height:calc(100vh - 30px);
+      display:flex;align-items:center;justify-content:center;
+      position:relative;padding:120px 14px 60px;
+      overflow:hidden;
     }
 
-    /* ========== СЕКЦИЯ С ЗЁРНАМИ И ПАКЕТАМИ ========== */
-    .coffee-beans-section {
-      background-color: #E7D6BF;
-      padding: 2rem 0;
+    .hero-inner{
+      width:100%;max-width:1100px;margin:0 auto;text-align:center;
+      display:grid;grid-template-columns:1fr 420px;gap:32px;align-items:center;
     }
 
-    .beans-content {
-      display: flex;
-      gap: 2rem;
-      justify-content: space-between;
+    .hero-content{
+      text-align:left;
     }
 
-    .beans-image, 
-    .bags-offer {
-      flex: 1;
+    .eyebrow{
+      display:inline-block;padding:8px 12px;border-radius:999px;font-weight:700;
+      background: linear-gradient(90deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+      color:var(--muted); margin-bottom:14px;
+      font-size:0.85rem;
     }
 
-    /* ========== СЕКЦИЯ С ОФФЕРОМ И ИНТЕРЬЕРОМ ========== */
-    .offer-section {
-      background-color: #F1E8D8;
-      padding: 3rem 0;
+    h1{
+      font-family:"Plus Jakarta Sans", Inter, sans-serif;
+      font-size:clamp(1.8rem, 4.8vw, 3.4rem);
+      margin:0 0 16px;line-height:1.02;
+      background: linear-gradient(90deg,#fff 0%, #fff 100%);
+      -webkit-background-clip:text;color:transparent;
+      letter-spacing:-0.6px;
     }
 
-    .offer-content {
-      display: flex;
-      gap: 2rem;
-      align-items: center;
+    p.lead{
+      color:var(--muted); font-size:1.05rem; margin-bottom:20px;
     }
 
-    .cafe-image {
-      flex: 1;
+    .hero-actions{ display:flex;gap:12px;flex-wrap:wrap }
+
+    .feature-card{
+      border-radius:18px;padding:18px;border:1px solid var(--border);
+      background: linear-gradient(180deg, rgba(255,255,255,0.015), transparent);
+      box-shadow:var(--shadow);
+      min-height:110px;
     }
 
-    .offer-text {
-      flex: 1;
+    /* Mini preview column */
+    .preview{
+      display:flex;flex-direction:column;gap:12px;
+      align-items:stretch;
     }
 
-    .offer-text h2 {
-      font-family: 'Playfair Display', serif;
-      font-size: 2rem;
-      color: #4C3928;
-      margin-bottom: 1rem;
+    .preview .mini{
+      border-radius:14px;
+      overflow:hidden;border:1px solid var(--border);
+      background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
     }
 
-    .offer-text p {
-      font-size: 1.2rem;
-      margin-bottom: 1.5rem;
-      color: #555;
+    /* Repository & Programs */
+    section.repository{
+      margin-top:40px;padding:48px 14px;background:transparent;
     }
 
-    /* ========== ПОДВАЛ (footer) ========== */
-    .footer {
-      background-color: #C7A57B;
-      padding: 1rem 0;
-      text-align: center;
+    .repo-grid{
+      display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px;
     }
 
-    .footer-content p {
-      color: #fff;
-      font-size: 0.9rem;
+    .program-card{
+      padding:18px;border-radius:14px;background:var(--bg-panel);border:1px solid var(--border);
+      transition: transform var(--transition), box-shadow var(--transition);
+      display:flex;flex-direction:column;gap:12px;
+    }
+    .program-card:hover{ transform:translateY(-8px); box-shadow:0 18px 40px rgba(10,8,20,0.45) }
+
+    .program-card h3{ margin:0;font-size:1.05rem }
+    .program-card p{ margin:0;color:var(--muted);font-size:0.95rem }
+
+    /* Info blocks */
+    .info-blocks{
+      margin-top:30px;padding:36px 14px;display:grid;gap:18px;
+      grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
     }
 
-    /* ========== АДАПТИВНОСТЬ (media queries) ========== */
-    @media (max-width: 992px) {
-      .hero-content, 
-      .beans-content, 
-      .offer-content {
-        flex-wrap: wrap;
-        justify-content: center;
-        text-align: center;
-      }
-
-      .hero-image {
-        text-align: center;
-        margin-top: 1rem;
-      }
+    .info-block{
+      border-radius:14px;padding:20px;background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
+      border:1px solid var(--border);
     }
 
-    @media (max-width: 768px) {
-      .header-content {
-        flex-wrap: wrap;
-      }
-
-      .nav ul {
-        flex-wrap: wrap;
-        gap: 1rem;
-        justify-content: center;
-        margin-top: 1rem;
-      }
-
-      .hero-text h1 {
-        font-size: 2.2rem;
-      }
+    /* Sketchfab section */
+    .sketchfab-section{
+      margin-top:28px;padding:28px 14px;border-radius:16px;border:1px solid var(--border);
+      background: linear-gradient(180deg, rgba(255,255,255,0.01), transparent);
+    }
+    .sketchfab-wrapper{
+      max-width:900px;margin:0 auto;border-radius:12px;overflow:hidden;border:1px solid rgba(255,255,255,0.03);
+      background: #000;
+    }
+    .sketchfab-placeholder{
+      min-height:320px;display:grid;place-items:center;color:var(--muted);
+      font-weight:600;padding:28px;
     }
 
-    @media (max-width: 576px) {
-      .container {
-        max-width: 95%;
-      }
-
-      .hero-text p,
-      .offer-text p {
-        font-size: 1rem;
-      }
-
-      .hero-text h1 {
-        font-size: 1.8rem;
-      }
-
-      .offer-text h2 {
-        font-size: 1.6rem;
-      }
+    /* Footer */
+    footer{
+      margin-top:34px;padding:28px 14px 80px;text-align:center;color:var(--muted);
     }
+    footer a{ color:var(--muted); font-weight:700; padding:6px; display:inline-block }
+
+    /* Modal calculator */
+    .calc-modal{
+      position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(2,2,6,0.6);
+      z-index:1600;padding:24px;
+    }
+    .calc-modal.open{ display:flex }
+    .calc-panel{
+      width:320px;border-radius:14px;padding:18px;background:var(--bg-panel);border:1px solid var(--border);
+      box-shadow:var(--shadow);
+    }
+    .calc-display{
+      width:100%;height:48px;border-radius:8px;padding:8px 12px;border:1px solid rgba(255,255,255,0.04);
+      background:transparent;color:var(--text-light); font-size:1.2rem;text-align:right;
+      margin-bottom:12px;
+    }
+    .calc-grid{ display:grid;grid-template-columns:repeat(4,1fr);gap:8px }
+    .calc-btn{ padding:12px;border-radius:10px;background:rgba(255,255,255,0.02);border:1px solid var(--border);cursor:pointer;font-weight:700 }
+
+    /* Particles canvas */
+    canvas#particles{
+      position:fixed;inset:0;z-index:0;pointer-events:none;opacity:0.95;
+    }
+
+    /* Responsive tweaks */
+    @media (max-width:980px){
+      .hero-inner{ grid-template-columns:1fr; text-align:center; }
+      .hero-content{text-align:center}
+      .preview{ order:-1 }
+    }
+
+    @media (max-width:720px){
+      .menu { display:none }
+      .hamburger { display:flex }
+      nav{ padding:10px }
+      .nav-inner{ padding:8px }
+      .hero{ padding-top:100px; }
+      .brand .title{ display:none }
+    }
+
+    /* small screens reduce particle opacity/size */
+    @media (max-width:420px){
+      canvas#particles{ opacity:0.6 }
+    }
+
+    /* subtle reveal animation for elements */
+    .reveal{ opacity:0; transform:translateY(10px) scale(0.995); transition:opacity 520ms ease, transform 520ms cubic-bezier(.2,.9,.25,1) }
+    .reveal.visible{ opacity:1; transform:none }
 
   </style>
 </head>
 <body>
-  <!-- Шапка -->
-  <header class="header">
-    <div class="container header-content">
-      <div class="logo">COFFEE SHOP</div>
-      <nav class="nav">
-        <ul>
-          <li><a href="#">Home</a></li>
-          <li><a href="#">About</a></li>
-          <li><a href="#">Menu</a></li>
-          <li><a href="#">Contact</a></li>
-        </ul>
-      </nav>
+  <!-- Particles canvas -->
+  <canvas id="particles" aria-hidden="true"></canvas>
+
+  <!-- Navigation -->
+  <nav>
+    <div class="nav-inner container" role="navigation" aria-label="Главная навигация">
+      <div class="brand" aria-hidden="false">
+        <div class="logo-svg" aria-hidden="true">
+          <!-- small SVG logo -->
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="#E100FF"/><stop offset="1" stop-color="#FFB347"/></linearGradient></defs>
+            <rect x="2" y="2" width="20" height="20" rx="5" fill="url(#g)"/>
+            <path d="M7 15L10 9l4 10 3-8" stroke="#fff" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="title">SYNPHORIA</div>
+      </div>
+
+      <div class="menu" role="menubar" aria-hidden="true">
+        <a href="#news" role="menuitem">News</a>
+        <a href="#main" role="menuitem">Main</a>
+        <a href="#faq" role="menuitem">FAQ</a>
+        <a href="#patch" role="menuitem">Patch</a>
+      </div>
+
+      <div class="cta" role="group" aria-label="Действия">
+        <button class="btn" id="locationBtn" title="Location">📍 Location</button>
+        <button class="btn primary" id="contactBtn" title="Contact">Contact</button>
+        <button class="theme-toggle" id="themeToggle" aria-label="Переключить тему">🌙</button>
+        <button class="hamburger" id="hamburger" aria-label="Открыть меню" aria-expanded="false">
+          <span class="lines"><span></span><span></span><span></span></span>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Mobile panel -->
+  <div class="mobile-panel" id="mobilePanel" role="dialog" aria-modal="true" aria-hidden="true">
+    <a href="#news">News</a>
+    <a href="#main">Main</a>
+    <a href="#faq">FAQ</a>
+    <a href="#patch">Patch</a>
+    <a href="#" id="mobileContact" class="btn primary" style="display:block;text-align:center">Contact</a>
+    <button id="mobileClose" class="btn" style="margin-top:8px">Close</button>
+  </div>
+
+  <!-- Hero -->
+  <header class="hero" id="main" role="banner">
+    <div class="container hero-inner">
+      <div class="hero-content">
+        <div class="eyebrow reveal">Набор инструментов • 2025</div>
+        <h1 class="reveal">Power Up Your Productivity — One Tool At a Time</h1>
+        <p class="lead reveal">Инструменты для аналитики, визуализации и вычислений. Быстро, красиво и интуитивно — для тех, кто не терпит тормозов.</p>
+
+        <div class="hero-actions reveal" style="margin-top:10px">
+          <a class="btn primary" href="#repository">Browse Tools</a>
+          <a class="btn" href="#sketchfab">Explore Info</a>
+          <button class="btn" id="openCalc">Open Calculator</button>
+        </div>
+
+        <div style="height:18px"></div>
+
+        <div class="repo-preview reveal" aria-hidden="true">
+          <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+            <div class="feature-card" style="flex:1;min-width:220px">
+              <strong>Star Mapper</strong>
+              <p style="margin:8px 0 0;color:var(--muted);font-size:0.95rem">Map the stars and navigate the universe with precision.</p>
+            </div>
+            <div class="feature-card" style="flex:1;min-width:220px">
+              <strong>Nebula Renderer</strong>
+              <p style="margin:8px 0 0;color:var(--muted);font-size:0.95rem">Generate stunning visuals of cosmic phenomena.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <aside class="preview" aria-hidden="true">
+        <div class="mini reveal" style="padding:14px">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="width:48px;height:48px;border-radius:10px;background:linear-gradient(135deg,#7F00FF,#E100FF);"></div>
+            <div>
+              <div style="font-weight:700">Quantum Calculator</div>
+              <div style="color:var(--muted);font-size:0.95rem">Быстрые вычисления и удобный интерфейс.</div>
+            </div>
+          </div>
+          <div style="margin-top:12px;display:flex;gap:8px">
+            <button class="btn" style="flex:1">Demo</button>
+            <button class="btn primary" style="flex:1">Download</button>
+          </div>
+        </div>
+
+        <div class="mini reveal" style="padding:12px;margin-top:12px">
+          <div style="font-weight:700;margin-bottom:8px">3D Обзор</div>
+          <div style="color:var(--muted);font-size:0.95rem">Интерактивная модель Земли</div>
+        </div>
+      </aside>
     </div>
   </header>
 
-  <!-- Герой-блок -->
-  <section class="hero">
-    <div class="container hero-content">
-      <div class="hero-text">
-        <h1>GREAT COFFEE SHOP</h1>
-        <p>We provide the best coffee in the city</p>
-        <a href="#" class="btn primary-btn">VIEW OUR MENU</a>
+  <!-- Repository -->
+  <section class="repository container" id="repository" aria-labelledby="repoTitle">
+    <h2 id="repoTitle" style="margin:0 0 18px">Repository of Programs</h2>
+
+    <div class="repo-grid reveal" id="repoGrid">
+      <div class="program-card">
+        <h3>Program 1: Star Mapper</h3>
+        <p>Map the stars and navigate the universe with precision.</p>
+        <div style="margin-top:auto;display:flex;gap:8px">
+          <a class="btn" href="#">Подробнее</a>
+          <a class="btn primary" href="#">Скачать</a>
+        </div>
       </div>
-      <div class="hero-image">
-        <!-- Заменить на свою картинку чашки -->
-        <img src="ED776D06-0522-4BE9-9A56-05035C4EB0EC.png" alt="Coffee Cup" />
+
+      <div class="program-card">
+        <h3>Program 2: Nebula Renderer</h3>
+        <p>Generate stunning visuals of cosmic phenomena.</p>
+        <div style="margin-top:auto;display:flex;gap:8px">
+          <a class="btn" href="#">Подробнее</a>
+          <a class="btn primary" href="#">Скачать</a>
+        </div>
+      </div>
+
+      <div class="program-card">
+        <h3>Program 3: Quantum Calculator</h3>
+        <p>Perform calculations beyond the limits of classical mathematics.</p>
+        <div style="margin-top:auto;display:flex;gap:8px">
+          <a class="btn" id="openCalc2">Open Calculator</a>
+          <a class="btn primary" href="#">Download</a>
+        </div>
       </div>
     </div>
   </section>
 
-  <!-- Блок с зернами и пакетами -->
-  <section class="coffee-beans-section">
-    <div class="container beans-content">
-      <div class="beans-image">
-        <!-- Заменить на свою картинку зерен -->
-        <img src="coffee-beans.jpg" alt="Coffee Beans" />
-      </div>
-      <div class="bags-offer">
-        <!-- Заменить на свою картинку пакетов -->
-        <img src="coffee-bags.jpg" alt="Coffee Bags" />
-      </div>
+  <!-- Info blocks -->
+  <section class="info-blocks container" aria-label="Информация">
+    <div class="info-block reveal">
+      <h3>О проекте</h3>
+      <p>Мы создаём инструменты, которые двигают технологии вперёд. Качество и инновации — наш главный приоритет.</p>
+    </div>
+    <div class="info-block reveal">
+      <h3>Наша Миссия</h3>
+      <p>Дать возможность каждому увеличить продуктивность с помощью передовых решений, разработанных с душой и опытом.</p>
+    </div>
+    <div class="info-block reveal">
+      <h3>Будущее Технологий</h3>
+      <p>Мы не просто следуем трендам — мы их создаём. Будь на шаг впереди с нашими решениями.</p>
     </div>
   </section>
 
-  <!-- Оффер и интерьер -->
-  <section class="offer-section">
-    <div class="container offer-content">
-      <div class="cafe-image">
-        <!-- Заменить на свою картинку интерьера -->
-        <img src="coffee-shop-interior.jpg" alt="Coffee Shop Interior" />
+  <!-- Sketchfab 3D Embed (lazy) -->
+  <section id="sketchfab" class="sketchfab-section container" aria-labelledby="sketchTitle">
+    <h3 id="sketchTitle">3D Обзор Земли</h3>
+    <div class="sketchfab-wrapper reveal" id="sketchfabWrapper">
+      <div class="sketchfab-placeholder" id="sketchfabPlaceholder">
+        Нажми для загрузки 3D модели → <button class="btn" id="loadSketch">Load Model</button>
       </div>
-      <div class="offer-text">
-        <h2>Enjoy Our Special Offers</h2>
-        <p>Get 20% off your first order today</p>
-        <a href="#" class="btn secondary-btn">GET STARTED</a>
-      </div>
+      <!-- iframe will be injected lazily -->
     </div>
   </section>
 
-  <!-- Подвал -->
-  <footer class="footer">
-    <div class="container footer-content">
-      <p>© 2025 Coffee Shop. All rights reserved.</p>
-    </div>
+  <!-- Footer -->
+  <footer role="contentinfo">
+    <p>&copy; 2025 Aether Nexus. Все права защищены.</p>
+    <p><a href="#">Privacy Policy</a> | <a href="#">Terms of Service</a> | <a href="#">Contact Us</a></p>
   </footer>
+
+  <!-- Calculator Modal -->
+  <div class="calc-modal" id="calcModal" aria-hidden="true" role="dialog" aria-label="Калькулятор">
+    <div class="calc-panel" role="document">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <strong>Quantum Calculator</strong>
+        <button class="btn" id="closeCalc">✕</button>
+      </div>
+      <input class="calc-display" id="calcDisplay" type="text" inputmode="decimal" aria-label="Дисплей калькулятора" readonly>
+      <div class="calc-grid">
+        <!-- buttons -->
+        <button class="calc-btn" data-val="7">7</button>
+        <button class="calc-btn" data-val="8">8</button>
+        <button class="calc-btn" data-val="9">9</button>
+        <button class="calc-btn" data-val="/">÷</button>
+
+        <button class="calc-btn" data-val="4">4</button>
+        <button class="calc-btn" data-val="5">5</button>
+        <button class="calc-btn" data-val="6">6</button>
+        <button class="calc-btn" data-val="*">×</button>
+
+        <button class="calc-btn" data-val="1">1</button>
+        <button class="calc-btn" data-val="2">2</button>
+        <button class="calc-btn" data-val="3">3</button>
+        <button class="calc-btn" data-val="-">−</button>
+
+        <button class="calc-btn" data-val="0">0</button>
+        <button class="calc-btn" data-val=".">.</button>
+        <button class="calc-btn" id="calcEquals">=</button>
+        <button class="calc-btn" data-val="+">+</button>
+      </div>
+      <div style="margin-top:10px;display:flex;gap:8px">
+        <button class="btn" id="calcClear" style="flex:1">C</button>
+        <button class="btn" id="calcBack" style="flex:1">⌫</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script>
+    // ----------------------------
+    // Utility & Shortcuts
+    // ----------------------------
+    const $ = sel => document.querySelector(sel);
+    const $$ = sel => Array.from(document.querySelectorAll(sel));
+
+    // Respect reduced motion
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    // ----------------------------
+    // Theme handling
+    // ----------------------------
+    (function themeInit(){
+      const html = document.documentElement;
+      const toggle = $('#themeToggle');
+      const saved = localStorage.getItem('theme');
+      const systemPref = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+      const theme = saved || systemPref || 'dark';
+      html.setAttribute('data-theme', theme);
+      toggle.textContent = theme === 'dark' ? '🌙' : '☀️';
+      toggle.addEventListener('click', () => {
+        const cur = html.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+        const next = cur === 'dark' ? 'light' : 'dark';
+        html.setAttribute('data-theme', next);
+        localStorage.setItem('theme', next);
+        toggle.textContent = next === 'dark' ? '🌙' : '☀️';
+      })
+    })();
+
+    // ----------------------------
+    // Mobile menu
+    // ----------------------------
+    (function mobileMenu(){
+      const burger = $('#hamburger');
+      const panel = $('#mobilePanel');
+      const closeBtn = $('#mobileClose');
+      burger.addEventListener('click', () => {
+        const open = panel.classList.toggle('open');
+        burger.setAttribute('aria-expanded', open ? 'true' : 'false');
+        panel.setAttribute('aria-hidden', !open);
+        // animate hamburger lines
+        const lines = burger.querySelectorAll('span');
+        if(open){
+          lines[0].style.transform = 'translateY(6px) rotate(45deg)';
+          lines[1].style.opacity = '0';
+          lines[2].style.transform = 'translateY(-6px) rotate(-45deg)';
+        } else {
+          lines[0].style.transform = '';
+          lines[1].style.opacity = '';
+          lines[2].style.transform = '';
+        }
+      });
+      closeBtn.addEventListener('click', () => { panel.classList.remove('open'); burger.setAttribute('aria-expanded','false'); });
+      // close when clicking a link
+      panel.addEventListener('click', (e)=>{ if(e.target.tagName==='A') { panel.classList.remove('open'); burger.setAttribute('aria-expanded','false'); }});
+    })();
+
+    // ----------------------------
+    // Scroll reveal
+    // ----------------------------
+    (function revealOnScroll(){
+      const items = $$('.reveal');
+      if(reduced){ items.forEach(i=>i.classList.add('visible')); return; }
+      const io = new IntersectionObserver((entries)=>{
+        entries.forEach(ent => {
+          if(ent.isIntersecting){ ent.target.classList.add('visible'); io.unobserve(ent.target); }
+        })
+      },{threshold:0.12});
+      items.forEach(i=>io.observe(i));
+    })();
+
+    // ----------------------------
+    // Lazy-load Sketchfab iframe
+    // ----------------------------
+    (function sketchfabLazy(){
+      const loadBtn = $('#loadSketch');
+      const wrapper = $('#sketchfabWrapper');
+      const placeholder = $('#sketchfabPlaceholder');
+      let loaded = false;
+      loadBtn.addEventListener('click', ()=> {
+        if(loaded) return;
+        const iframe = document.createElement('iframe');
+        iframe.setAttribute('title','Earth - 3D Model');
+        iframe.setAttribute('allow','autoplay; fullscreen; xr-spatial-tracking');
+        iframe.setAttribute('src','https://sketchfab.com/models/41fc80d85dfd480281f21b74b2de2faa/embed?autospin=1&autostart=1&preload=1&transparent=1&ui_theme=dark&dnt=1');
+        iframe.style.width='100%';iframe.style.height='520px';iframe.loading='lazy';iframe.style.border='0';
+        wrapper.appendChild(iframe);
+        placeholder.remove();
+        loaded=true;
+      });
+
+      // also load when scrolled into view automatically
+      const obs = new IntersectionObserver((entries)=>{
+        entries.forEach(e=>{ if(e.isIntersecting){ loadBtn.click(); obs.disconnect(); }});
+      },{threshold:0.25});
+      obs.observe(wrapper);
+    })();
+
+    // ----------------------------
+    // Particles (lightweight & adaptive)
+    // ----------------------------
+    (function particles(){
+      const canvas = document.getElementById('particles');
+      if(!canvas) return;
+      const ctx = canvas.getContext('2d', { alpha:true });
+      let W = innerWidth, H = innerHeight;
+      let particles = [];
+      const isMobile = /Mobi|Android/i.test(navigator.userAgent) || innerWidth < 720;
+      const COUNT = isMobile ? 60 : 160;
+      const maxR = isMobile ? 1.2 : 1.8;
+      function setup(){
+        canvas.width = W = innerWidth;
+        canvas.height = H = innerHeight;
+        particles = Array.from({length:COUNT}, ()=>({
+          x: Math.random()*W,
+          y: Math.random()*H,
+          r: Math.random()*maxR + 0.2,
+          dx: (Math.random()-0.5) * (isMobile?0.4:0.9),
+          dy: (Math.random()-0.5) * (isMobile?0.4:0.9),
+          alpha: Math.random()*0.8 + 0.2
+        }));
+      }
+      function draw(){
+        if(window.getComputedStyle(canvas).display==='none') return;
+        ctx.clearRect(0,0,W,H);
+        ctx.globalCompositeOperation='lighter';
+        particles.forEach(p=>{
+          ctx.beginPath();
+          ctx.fillStyle = `rgba(255,255,255,${p.alpha})`;
+          ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+          ctx.fill();
+        });
+      }
+      function update(){
+        particles.forEach(p=>{
+          p.x += p.dx;
+          p.y += p.dy;
+          if(p.x < -10) p.x = W + 10;
+          if(p.x > W + 10) p.x = -10;
+          if(p.y < -10) p.y = H + 10;
+          if(p.y > H + 10) p.y = -10;
+        });
+      }
+      function loop(){
+        if(!reduced) requestAnimationFrame(loop);
+        update(); draw();
+      }
+      addEventListener('resize', ()=>{ setup(); draw(); });
+      setup(); loop();
+      // If prefers-reduced-motion, render static snapshot
+      if(reduced){ update(); draw(); }
+    })();
+
+    // ----------------------------
+    // Parallax subtle on scroll for hero
+    // ----------------------------
+    (function parallaxHero(){
+      const hero = document.querySelector('.hero');
+      if(!hero || reduced) return;
+      window.addEventListener('scroll', () => {
+        const sc = window.scrollY;
+        hero.style.transform = `translateY(${sc * 0.02}px)`;
+      }, {passive:true});
+    })();
+
+    // ----------------------------
+    // Calculator (safe-ish, sanitized)
+    // ----------------------------
+    (function calculator(){
+      const openBtns = [$('#openCalc'), $('#openCalc2')].filter(Boolean);
+      const modal = $('#calcModal');
+      const display = $('#calcDisplay');
+      const calcBtns = $$('.calc-btn');
+      const clear = $('#calcClear');
+      const back = $('#calcBack');
+      const equals = $('#calcEquals');
+      const close = $('#closeCalc');
+
+      function showCalc(){ modal.classList.add('open'); modal.setAttribute('aria-hidden','false'); display.value=''; }
+      function hideCalc(){ modal.classList.remove('open'); modal.setAttribute('aria-hidden','true'); display.value=''; }
+
+      openBtns.forEach(b=>b && b.addEventListener('click', showCalc));
+      close.addEventListener('click', hideCalc);
+      document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') hideCalc(); });
+
+      calcBtns.forEach(btn=>{
+        btn.addEventListener('click', ()=> {
+          const v = btn.dataset.val;
+          if(!v) return;
+          display.value += v;
+        });
+      });
+
+      clear.addEventListener('click', ()=> display.value='');
+      back.addEventListener('click', ()=> display.value = display.value.slice(0,-1));
+
+      // Evaluate safely: allow only digits, operators and whitespace
+      equals.addEventListener('click', ()=> {
+        const expr = display.value.trim();
+        if(!expr) return;
+        // only allow characters 0-9 . + - * / ( ) % whitespace
+        if(!/^[0-9+\-*/().%\s]*$/.test(expr)){
+          display.value = 'Error';
+          return;
+        }
+        try{
+          // eslint-disable-next-line no-new-func
+          const fn = new Function('return (' + expr + ')');
+          const result = fn();
+          display.value = (typeof result === 'number' && isFinite(result)) ? String(result) : 'Error';
+        }catch(e){
+          display.value = 'Error';
+        }
+      });
+    })();
+
+    // ----------------------------
+    // Small UI: contact/location buttons (placeholder)
+    // ----------------------------
+    (function miscBtns(){
+      $('#contactBtn').addEventListener('click', ()=> alert('Contact form placeholder — добавь форму по своему усмотрению.'));
+      $('#locationBtn').addEventListener('click', ()=> alert('Location placeholder — можно подключить карту.'));
+      $('#mobileContact').addEventListener('click', ()=> alert('Mobile contact placeholder.'));
+    })();
+
+    // ----------------------------
+    // Accessibility: focus outlines and keyboard trap for mobile panel
+    // ----------------------------
+    (function a11y(){
+      document.addEventListener('keyup', (e)=> {
+        if(e.key === 'Tab') document.documentElement.classList.add('user-is-tabbing');
+      });
+    })();
+
+    // ----------------------------
+    // Tiny analytics-like local debug (disabled)
+    // ----------------------------
+    // (function debug(){ console.log('SYNPHORIA page ready'); })();
+
+  </script>
 </body>
 </html>
+        
