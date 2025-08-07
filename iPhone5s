@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no" />
+<title>Эмулятор iPhone 5s — демо</title>
+<style>
+  :root{
+    --device-w: 320px; /* iPhone 5s logical width */
+    --device-h: 568px;
+    --bezel: 18px;
+    --bg: linear-gradient(180deg,#0b1220,#071028);
+    --icon-size: 58px;
+  }
+  body{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    min-height:100vh;
+    margin:0;
+    background: #111;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    -webkit-font-smoothing:antialiased;
+    color:#fff;
+  }
+
+  /* device frame */
+  .device{
+    width: calc(var(--device-w) + var(--bezel)*2);
+    height: calc(var(--device-h) + var(--bezel)*2 + 44px); /* add home area */
+    background: #000;
+    border-radius: 40px;
+    padding: var(--bezel);
+    box-sizing:border-box;
+    box-shadow: 0 30px 80px rgba(0,0,0,.7), 0 8px 20px rgba(0,0,0,.6);
+    position:relative;
+  }
+  /* inner screen */
+  .screen{
+    width: var(--device-w);
+    height: var(--device-h);
+    background: var(--bg);
+    border-radius: 8px;
+    overflow:hidden;
+    position:relative;
+    box-shadow: inset 0 2px 0 rgba(255,255,255,0.02);
+    touch-action: none;
+  }
+
+  /* status bar */
+  .status{
+    height: 20px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding: 4px 8px;
+    font-size:11px;
+    color: rgba(255,255,255,.9);
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
+    z-index:10;
+  }
+  .status .left, .status .right{display:flex;gap:6px;align-items:center}
+  .time { font-weight:600; font-size:13px; }
+
+  /* home screen */
+  .home{
+    position:absolute;
+    left:0;right:0;top:20px;bottom:0;
+    padding: 18px 10px 22px 10px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:8px;
+    box-sizing:border-box;
+    transition:transform .28s ease;
+  }
+
+  .icon-grid{
+    width:100%;
+    display:grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-auto-rows: 90px;
+    gap: 10px;
+    justify-items:center;
+    align-items:end;
+    padding-bottom:6px;
+    box-sizing:border-box;
+  }
+
+  .icon{
+    width:var(--icon-size);
+    height:var(--icon-size);
+    background: rgba(255,255,255,.06);
+    border-radius: 13px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    box-shadow: 0 4px 0 rgba(0,0,0,.35);
+    flex-direction:column;
+    cursor:pointer;
+    user-select:none;
+    transition: transform .12s ease, box-shadow .12s ease;
+  }
+  .icon:active{ transform: scale(.96); }
+  .icon img{ width:36px;height:36px; filter: drop-shadow(0 1px 0 rgba(0,0,0,.6)); }
+  .label{ font-size:10px; margin-top:6px; color:#ddd; text-align:center; width:72px; }
+
+  /* dock */
+  .dock{
+    width: calc(100% - 24px);
+    height: 64px;
+    background: rgba(255,255,255,.06);
+    border-radius: 14px;
+    display:flex;
+    align-items:center;
+    justify-content:space-around;
+    position:absolute;
+    bottom: 18px;
+    left:12px;
+    padding: 0 6px;
+    box-sizing:border-box;
+    z-index:5;
+  }
+
+  /* app window */
+  .app{
+    position:absolute;
+    left:6px; right:6px; top:44px; bottom:80px;
+    background: #fff;
+    color:#000;
+    border-radius:8px;
+    overflow:auto;
+    transform: translateY(20px) scale(.98);
+    opacity:0;
+    transition: transform .28s cubic-bezier(.2,.9,.2,1), opacity .22s;
+    z-index:50;
+    box-shadow: 0 40px 60px rgba(0,0,0,.6);
+    display:flex;
+    flex-direction:column;
+  }
+  .app.open{
+    transform: translateY(0) scale(1);
+    opacity:1;
+  }
+  .app .app-header{
+    height:44px;
+    display:flex;
+    align-items:center;
+    padding: 0 12px;
+    background: linear-gradient(180deg,#f6f6f6,#eaeaea);
+    border-bottom: 1px solid rgba(0,0,0,.06);
+  }
+  .app .content{ padding:12px; flex:1; overflow:auto; font-size:14px; }
+
+  /* lock screen overlay */
+  .lock{
+    position:absolute;
+    inset:0;
+    background: linear-gradient(180deg, rgba(6,8,12,.2), rgba(6,8,12,.7));
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    z-index:80;
+    transition: transform .36s cubic-bezier(.2,.9,.2,1), opacity .2s;
+    touch-action:none;
+  }
+  .lock.hidden{ transform: translateY(-100%); opacity:0; pointer-events:none; }
+
+  .lock .time-large{ font-size:48px; font-weight:300; margin-bottom:6px; }
+  .lock .date-small{ font-size:14px; color:rgba(255,255,255,.85); margin-bottom:24px; }
+  .lock .swipe-hint{ font-size:12px; color:rgba(255,255,255,.7); }
+
+  /* control center */
+  .control{
+    position:absolute;
+    left:0; right:0; bottom:0;
+    height:52%;
+    background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.02));
+    border-top-left-radius:14px;
+    border-top-right-radius:14px;
+    transform: translateY(100%);
+    transition: transform .26s ease;
+    z-index:90;
+    padding:12px;
+    box-sizing:border-box;
+    color:#fff;
+    backdrop-filter: blur(6px);
+  }
+  .control.open{ transform: translateY(0); }
+
+  /* home button area */
+  .home-button{
+    height:44px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    margin-top:8px;
+  }
+  .home-button .circle{
+    width:50px;height:50px;border-radius:50%;
+    background:#111;box-shadow: inset 0 1px 0 rgba(255,255,255,.03);
+    border: 2px solid rgba(255,255,255,.04);
+    display:flex;align-items:center;justify-content:center;color:#888;font-size:12px;
+    user-select:none;
+    cursor:pointer;
+  }
+
+  /* helpful visuals for demo */
+  .fake-screen-bg{
+    position:absolute; inset:0; background-image: url(''); background-size:cover; opacity:.06; pointer-events:none;
+  }
+  /* small responsive tweak */
+  @media (max-width:520px){
+    body{ padding:12px; }
+    .device{ transform: scale(.95); }
+  }
+</style>
+</head>
+<body>
+  <div class="device" id="device">
+    <div class="screen" id="screen">
+      <div class="status">
+        <div class="left">
+          <span style="font-size:11px">Vodafone</span>
+        </div>
+        <div class="time" id="status-time">1:23</div>
+        <div class="right">
+          <span>🔋100%</span>
+        </div>
+      </div>
+
+      <!-- Home / Desktop -->
+      <div class="home" id="home">
+        <div class="icon-grid" id="grid">
+          <!-- icons (we'll generate via JS for simplicity) -->
+        </div>
+
+        <div class="dock">
+          <div class="icon dock-icon" data-app="phone"><img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='12' cy='12' r='10' fill='%23fff'/></svg>" alt=""><div class="label">Phone</div></div>
+          <div class="icon dock-icon" data-app="messages"><img src="" alt=""><div class="label">Messages</div></div>
+          <div class="icon dock-icon" data-app="safari"><img src="" alt=""><div class="label">Safari</div></div>
+          <div class="icon dock-icon" data-app="music"><img src="" alt=""><div class="label">Music</div></div>
+        </div>
+      </div>
+
+      <!-- App windows -->
+      <div class="app" id="app-phone">
+        <div class="app-header"><strong>Phone</strong></div>
+        <div class="content">Это демо-приложение «Телефон». Нажми Home чтобы закрыть.</div>
+      </div>
+      <div class="app" id="app-safari">
+        <div class="app-header"><strong>Safari</strong></div>
+        <div class="content">
+          <p>Встроенный мини-браузер (демо):</p>
+          <input id="fake-url" style="width:100%;padding:8px;border-radius:6px;border:1px solid #ddd;" placeholder="https://example.com"/>
+          <div style="margin-top:10px;font-size:13px;color:#444">Нажми кнопку ниже, чтобы "загрузить" страницу (локально).</div>
+          <button id="load-fake" style="margin-top:8px;padding:8px 12px;border-radius:6px;border:none;background:#007aff;color:#fff;">Загрузить</button>
+          <div id="fake-page" style="margin-top:12px;background:#fafafa;border:1px solid #eee;padding:10px;border-radius:6px;min-height:120px;color:#333;"></div>
+        </div>
+      </div>
+      <div class="app" id="app-photos">
+        <div class="app-header"><strong>Photos</strong></div>
+        <div class="content">Здесь мог бы быть твой фотоальбом. Это заглушка.</div>
+      </div>
+
+      <!-- Lock screen overlay -->
+      <div class="lock" id="lock">
+        <div class="time-large" id="lock-time">1:23</div>
+        <div class="date-small" id="lock-date">Четверг, 7 августа</div>
+        <div class="swipe-hint">Проведи вверх, чтобы разблокировать</div>
+      </div>
+
+      <!-- Control center -->
+      <div class="control" id="control">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 6px;">
+          <div>Режим полёта</div>
+          <div>Wi-Fi: on</div>
+        </div>
+        <div style="margin-top:12px;color:rgba(255,255,255,.8);font-size:13px">Центр управления (свайп снизу)</div>
+      </div>
+
+      <div class="fake-screen-bg"></div>
+    </div>
+
+    <div class="home-button" id="home-area">
+      <div class="circle" id="home-btn">Home</div>
+    </div>
+  </div>
+
+<script>
+/* ====== Простая логика эмуляции ====== */
+
+const apps = [
+  {id:'phone', name:'Phone', icon:''},
+  {id:'messages', name:'Messages', icon:''},
+  {id:'photos', name:'Photos', icon:''},
+  {id:'camera', name:'Camera', icon:''},
+  {id:'calendar', name:'Calendar', icon:''},
+  {id:'settings', name:'Settings', icon:''},
+  {id:'safari', name:'Safari', icon:''},
+  {id:'music', name:'Music', icon:''},
+  {id:'notes', name:'Notes', icon:''},
+  {id:'maps', name:'Maps', icon:''},
+  {id:'clock', name:'Clock', icon:''},
+  {id:'mail', name:'Mail', icon:''}
+];
+
+const grid = document.getElementById('grid');
+apps.forEach(a=>{
+  const el = document.createElement('div');
+  el.className='icon';
+  el.dataset.app = a.id;
+  // simple SVG placeholder
+  el.innerHTML = `<div style="width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:18px">📱</div><div class="label">${a.name}</div>`;
+  grid.appendChild(el);
+});
+
+function openApp(id){
+  const win = document.getElementById('app-' + (id==='safari'?'safari': id==='photos'?'photos': id==='phone'?'phone': id));
+  if(!win) return;
+  // close others
+  document.querySelectorAll('.app').forEach(a=>a.classList.remove('open'));
+  win.classList.add('open');
+  // hide home slightly
+  document.getElementById('home').style.transform = 'scale(.98) translateY(4px)';
+}
+
+function closeAllApps(){
+  document.querySelectorAll('.app').forEach(a=>a.classList.remove('open'));
+  document.getElementById('home').style.transform = '';
+}
+
+/* click handlers */
+document.addEventListener('click', e=>{
+  const icon = e.target.closest('.icon');
+  if(icon && icon.dataset.app){
+    // if locked, ignore
+    if(!locked) openApp(icon.dataset.app);
+  }
+});
+
+/* Home button */
+document.getElementById('home-btn').addEventListener('click', ()=>{
+  closeAllApps();
+});
+
+/* Fake Safari loader */
+document.getElementById('load-fake').addEventListener('click', ()=>{
+  const v = document.getElementById('fake-url').value || 'https://example.com';
+  const area = document.getElementById('fake-page');
+  area.textContent = `«Загружена» страница: ${v}\n\n(Это демо — нет реального доступа в интернет)`;
+});
+
+/* Lock screen + swipe up to unlock */
+let locked = false;
+const lockEl = document.getElementById('lock');
+const home = document.getElementById('home');
+function updateTime(){
+  const t = new Date();
+  const hh = t.getHours(); const mm = String(t.getMinutes()).padStart(2,'0');
+  document.getElementById('status-time').textContent = `${hh}:${mm}`;
+  document.getElementById('lock-time').textContent = `${hh}:${mm}`;
+  const opts = { weekday: 'long', month: 'long', day:'numeric' };
+  document.getElementById('lock-date').textContent = t.toLocaleDateString('ru-RU', opts);
+}
+updateTime();
+setInterval(updateTime, 30*1000);
+
+/* start locked for demo */
+locked = true;
+lockEl.classList.remove('hidden');
+
+let startY = null;
+let swipeThreshold = 60;
+
+function onTouchStart(e){
+  const touch = e.touches ? e.touches[0] : e;
+  startY = touch.clientY;
+}
+function onTouchMove(e){
+  if(startY==null) return;
+  const touch = e.touches ? e.touches[0] : e;
+  const dy = touch.clientY - startY;
+  // if lock visible and user swipes up enough -> unlock
+  if(locked && dy < -swipeThreshold){
+    locked = false;
+    lockEl.classList.add('hidden');
+  }
+}
+function onTouchEnd(e){
+  startY = null;
+}
+
+/* Control center: swipe up from very bottom when unlocked to open */
+const control = document.getElementById('control');
+let bottomStartY = null;
+let bottomZone = 40; // px from bottom to trigger
+
+function onDown(e){
+  const touch = e.touches ? e.touches[0] : e;
+  const rect = document.getElementById('screen').getBoundingClientRect();
+  const localY = touch.clientY - rect.top;
+  const localX = touch.clientX - rect.left;
+  // bottom swipe start
+  if(!locked && localY > rect.height - bottomZone){
+    bottomStartY = touch.clientY;
+  } else bottomStartY = null;
+
+  // also allow drag on lock for unlocking
+  if(locked) onTouchStart(e);
+}
+function onMove(e){
+  const touch = e.touches ? e.touches[0] : e;
+  if(bottomStartY){
+    const dy = bottomStartY - touch.clientY;
+    if(dy > 30) control.classList.add('open');
+  }
+  if(locked) onTouchMove(e);
+}
+function onUp(e){
+  bottomStartY = null;
+  if(locked) onTouchEnd(e);
+}
+
+/* close control center by tapping or swiping down */
+control.addEventListener('click', (ev)=>{ ev.stopPropagation(); });
+document.getElementById('screen').addEventListener('click', ()=>{ control.classList.remove('open'); });
+
+document.getElementById('screen').addEventListener('touchstart', onDown);
+document.getElementById('screen').addEventListener('touchmove', onMove);
+document.getElementById('screen').addEventListener('touchend', onUp);
+
+/* For mouse testing on desktop */
+document.getElementById('screen').addEventListener('mousedown', onDown);
+document.addEventListener('mousemove', onMove);
+document.addEventListener('mouseup', onUp);
+
+/* simple keyboard shortcuts for demo */
+document.addEventListener('keydown', (e)=>{
+  if(e.key === 'Escape') { locked = true; lockEl.classList.remove('hidden'); closeAllApps(); control.classList.remove('open'); }
+  if(e.key === 'h') closeAllApps();
+  if(e.key === 'c') control.classList.toggle('open');
+});
+
+/* disable native drag to make interactions smoother */
+document.addEventListener('dragstart', e=>e.preventDefault());
+</script>
+</body>
+</html>
