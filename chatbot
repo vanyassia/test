@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<title>Offline NN Chatbot — Всё в одном файле</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<style>
+  :root{--bg:#0f1720;--card:#121827;--accent:#38bdf8;--muted:#94a3b8}
+  body{margin:0;background:var(--bg);color:#e6eef6;font-family:Inter,Arial,Helvetica,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;padding:12px}
+  .card{width:980px;max-width:100%;background:linear-gradient(180deg,rgba(255,255,255,.02),transparent);border-radius:12px;padding:16px;display:grid;grid-template-columns:1fr 380px;gap:12px;box-shadow:0 8px 30px rgba(2,6,23,.6)}
+  h1{margin:0 0 8px 0;font-size:18px}
+  .chat{background:#071023;border-radius:8px;padding:12px;display:flex;flex-direction:column;height:540px}
+  #messages{flex:1;overflow:auto;padding:6px;border-radius:6px}
+  .msg{margin:6px 0;padding:8px;border-radius:8px;max-width:80%;}
+  .me{background:#0b2a43;margin-left:auto;color:#dff4ff}
+  .bot{background:#112a17;color:#eaffdb}
+  .controls{display:flex;gap:8px;margin-top:8px}
+  input[type="text"]{flex:1;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,.06);background:transparent;color:inherit}
+  button{padding:10px 12px;border-radius:8px;border:none;background:var(--accent);color:#022;cursor:pointer}
+  .panel{background:linear-gradient(180deg,rgba(255,255,255,.01),transparent);padding:12px;border-radius:8px;height:540px;overflow:auto}
+  label{display:block;font-size:13px;color:var(--muted);margin:8px 0 4px}
+  textarea{width:100%;height:80px;padding:8px;border-radius:6px;background:#071021;border:1px solid rgba(255,255,255,.03);color:inherit}
+  .small{font-size:12px;color:var(--muted)}
+  .row{display:flex;gap:8px;align-items:center}
+  .list{background:#06121a;padding:8px;border-radius:6px;margin-top:8px}
+  .example{padding:6px;border-radius:6px;background:#081824;margin:6px 0;display:flex;justify-content:space-between;align-items:center}
+  .conf{font-size:12px;color:var(--muted)}
+  .danger{background:#7f1d1d;color:#ffdede}
+  footer{font-size:12px;color:var(--muted);margin-top:10px}
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div>
+    <h1>Offline NN Chatbot — простой нейро-бот в одном файле</h1>
+    <div class="chat" id="chat">
+      <div id="messages"></div>
+      <div class="controls">
+        <input id="userInput" type="text" placeholder="Напиши сообщение и нажми Enter или кнопку" onkeydown="if(event.key==='Enter') send()">
+        <button onclick="send()">Отправить</button>
+        <button onclick="clearChat()" class="danger">Очистить</button>
+      </div>
+      <div class="small" id="status">Модель: не инициализирована</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="row">
+      <div style="flex:1">
+        <label>Примеры (вопрос → ответ). Добавь свои, чтобы улучшить поведение:</label>
+        <textarea id="pairsInput"></textarea>
+        <div class="small">Формат: с новой строки — вход║ответ . Пример: Привет║Привет, рад помочь!</div>
+        <div style="margin-top:8px" class="row">
+          <button onclick="loadExamples()">Загрузить примеры</button>
+          <button onclick="saveExamples()">Сохранить в память</button>
+          <button onclick="resetModel()">Переинициализировать сеть</button>
+        </div>
+      </div>
+    </div>
+
+    <label>Обучение</label>
+    <div class="row" style="gap:6px">
+      <input id="epochs" type="number" value="150" style="width:90px;padding:8px;border-radius:6px;background:#071821;border:1px solid rgba(255,255,255,.03);color:inherit">
+      <input id="lr" type="number" value="0.12" step="0.01" style="width:90px;padding:8px;border-radius:6px;background:#071821;border:1px solid rgba(255,255,255,.03);color:inherit">
+      <button onclick="trainFromUI()">Train</button>
+    </div>
+    <div id="trainLog" class="small" style="margin-top:8px"></div>
+
+    <label style="margin-top:10px">Текущие шаблонные ответы (классы)</label>
+    <div class="list" id="responsesList"></div>
+
+    <label style="margin-top:10px">Инструменты</label>
+    <div class="small">
+      <div style="margin-top:6px">• Модель обновляется/переинициализируется при изменении ответов.</div>
+      <div>• Данные и веса сохраняются в localStorage (ключ: <code>offline_nn_bot_v1</code>).</div>
+      <div>• Если уверенность слишком низкая, бот возвращает ближайший пример (fuzzy).</div>
+    </div>
+
+    <footer>Сделано оффлайн — модель работает в твоём браузере. Не ожидать чудес, но её можно тренировать прямо тут!</footer>
+  </div>
+</div>
+
+<script>
+/* ===================== Простая нейронка в браузере =====================
+   Архитектура: input(256) -> hidden(64,tanh) -> output(nResponses,softmax)
+   Feature hashing слов в 0..255
+   SGD с cross-entropy (онлайн)
+   Хранение: localStorage
+   ===================================================================== */
+
+/* ------ utils ------ */
+function rand(a,b){return Math.random()*(b-a)+a}
+function zeros(n){return new Array(n).fill(0)}
+function argmax(arr){let m=-Infinity,mi=0;for(let i=0;i<arr.length;i++){if(arr[i]>m){m=arr[i];mi=i}}return mi}
+function softmax(logits){
+  let max = Math.max(...logits), ex = logits.map(x=>Math.exp(x-max)), sum = ex.reduce((a,b)=>a+b,0);
+  return ex.map(e=>e/sum)
+}
+function dot(a,b){let s=0; for(let i=0;i<a.length;i++) s+=a[i]*b[i]; return s}
+function add(a,b){for(let i=0;i<a.length;i++) a[i]+=b[i];}
+function tanh(x){return Math.tanh(x)}
+function tanh_deriv(y){return 1 - y*y} // y = tanh(x)
+
+/* ---- hashing vectorizer ---- */
+const INPUT_SIZE = 256;
+function tokenize(s){ return s.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu," ").split(/\s+/).filter(Boolean) }
+function wordHash(w){
+  // простая хеш-функция для строки -> 0..INPUT_SIZE-1
+  let h=2166136261>>>0;
+  for(let i=0;i<w.length;i++){ h ^= w.charCodeAt(i); h = Math.imul(h,16777619)>>>0; }
+  return h % INPUT_SIZE;
+}
+function textToVec(s){
+  let vec = new Array(INPUT_SIZE).fill(0);
+  for(let w of tokenize(s)){ vec[wordHash(w)] += 1 }
+  // нормализуем L2
+  let norm = Math.sqrt(vec.reduce((a,b)=>a+b*b,0)) || 1;
+  for(let i=0;i<INPUT_SIZE;i++) vec[i] /= norm;
+  return vec;
+}
+
+/* ---- модель ---- */
+let model = {
+  inputSize: INPUT_SIZE,
+  hiddenSize: 64,
+  outSize: 0,
+  W1: null, b1: null, W2: null, b2: null
+};
+let responses = []; // массив шаблонов ответов (строк)
+let dataset = []; // {in: "текст", outIdx: i}
+
+/* инициализация/переинициализация */
+function initModel(){
+  model.outSize = Math.max(1, responses.length);
+  model.W1 = new Array(model.hiddenSize).fill(0).map(()=> new Array(model.inputSize).fill(0).map(()=> rand(-0.2,0.2)));
+  model.b1 = new Array(model.hiddenSize).fill(0).map(()=>0);
+  model.W2 = new Array(model.outSize).fill(0).map(()=> new Array(model.hiddenSize).fill(0).map(()=> rand(-0.2,0.2)));
+  model.b2 = new Array(model.outSize).fill(0).map(()=>0);
+  saveState();
+  setStatus('Модель инициализирована ('+model.inputSize+'→'+model.hiddenSize+'→'+model.outSize+')');
+  renderResponses();
+}
+
+/* forward */
+function forward(x){
+  // x: input vector
+  let h = new Array(model.hiddenSize);
+  for(let i=0;i<model.hiddenSize;i++){
+    let s = model.b1[i] + dot(model.W1[i], x);
+    h[i] = tanh(s);
+  }
+  let logits = new Array(model.outSize);
+  for(let j=0;j<model.outSize;j++){
+    logits[j] = model.b2[j] + dot(model.W2[j], h);
+  }
+  let probs = softmax(logits);
+  return {h, logits, probs};
+}
+
+/* predict -> {index, prob} */
+function predict(text){
+  if(model.outSize===0) return {index:-1, prob:0};
+  let x = textToVec(text);
+  let res = forward(x);
+  let idx = argmax(res.probs);
+  return {index: idx, prob: res.probs[idx], hidden: res.h, x};
+}
+
+/* SGD training for one sample */
+function trainOnSample(text, targetIdx, lr=0.12){
+  let x = textToVec(text);
+  // forward
+  let h = new Array(model.hiddenSize);
+  for(let i=0;i<model.hiddenSize;i++){ h[i] = tanh(model.b1[i] + dot(model.W1[i], x)); }
+  let logits = new Array(model.outSize);
+  for(let j=0;j<model.outSize;j++){ logits[j] = model.b2[j] + dot(model.W2[j], h); }
+  let probs = softmax(logits);
+
+  // grad w.r.t logits: probs - onehot
+  let dlog = probs.slice();
+  dlog[targetIdx] -= 1; // shape outSize
+
+  // update W2, b2
+  for(let j=0;j<model.outSize;j++){
+    let g = dlog[j];
+    for(let i=0;i<model.hiddenSize;i++){
+      model.W2[j][i] -= lr * g * h[i];
+    }
+    model.b2[j] -= lr * g;
+  }
+
+  // backprop to hidden: dh = sum_j W2_j * dlog_j
+  let dh = new Array(model.hiddenSize).fill(0);
+  for(let i=0;i<model.hiddenSize;i++){
+    let s=0;
+    for(let j=0;j<model.outSize;j++) s += model.W2[j][i] * dlog[j];
+    dh[i] = s * tanh_deriv(h[i]);
+  }
+
+  // update W1, b1
+  for(let i=0;i<model.hiddenSize;i++){
+    let gi = dh[i];
+    for(let k=0;k<model.inputSize;k++){
+      model.W1[i][k] -= lr * gi * x[k];
+    }
+    model.b1[i] -= lr * gi;
+  }
+}
+
+/* тренировка по всему датасету */
+async function train(epochs=100, lr=0.12, progressCb=null){
+  if(dataset.length===0){ if(progressCb) progressCb('Нет примеров для обучения'); return; }
+  for(let e=0;e<epochs;e++){
+    // можно перетасовать датасет
+    for(let t=0;t<dataset.length;t++){
+      let i = Math.floor(Math.random()*dataset.length);
+      let s = dataset[i];
+      trainOnSample(s.in, s.outIdx, lr);
+    }
+    if(progressCb && (e%10===0 || e===epochs-1)) progressCb('Эпоха '+(e+1)+'/'+epochs);
+    // даём браузеру обновить UI
+    if(e%20===0) await new Promise(r=>setTimeout(r,0));
+  }
+  saveState();
+  if(progressCb) progressCb('Обучение завершено');
+}
+
+/* --- fallback: ближайший пример (cosine) --- */
+function cosineSim(vecA, vecB){
+  let s=0, a2=0, b2=0;
+  for(let i=0;i<vecA.length;i++){ s+=vecA[i]*vecB[i]; a2+=vecA[i]*vecA[i]; b2+=vecB[i]*vecB[i]; }
+  return s / (Math.sqrt(a2*b2)+1e-9);
+}
+function nearestExample(text){
+  if(dataset.length===0) return null;
+  let v = textToVec(text);
+  let best=null, bi=-1;
+  for(let i=0;i<dataset.length;i++){
+    let dv = textToVec(dataset[i].in);
+    let sim = cosineSim(v,dv);
+    if(best===null || sim>best){ best=sim; bi=i; }
+  }
+  return {idx: bi, sim: best};
+}
+
+/* ---------- persistence (localStorage) ---------- */
+const STORAGE_KEY = 'offline_nn_bot_v1';
+function saveState(){
+  try{
+    const payload = {responses, dataset, model: {W1:model.W1, b1:model.b1, W2:model.W2, b2:model.b2}};
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  }catch(e){ console.warn('Save failed',e) }
+}
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw) return false;
+    const payload = JSON.parse(raw);
+    responses = payload.responses || [];
+    dataset = payload.dataset || [];
+    if(payload.model){
+      model.W1 = payload.model.W1; model.b1 = payload.model.b1; model.W2 = payload.model.W2; model.b2 = payload.model.b2;
+      model.inputSize = INPUT_SIZE; model.hiddenSize = model.W1.length; model.outSize = model.W2.length;
+    } else {
+      initModel();
+    }
+    renderResponses();
+    setStatus('Загружено из памяти ('+responses.length+' ответов, '+dataset.length+' примеров)');
+    return true;
+  }catch(e){ console.warn('Load failed',e); return false }
+}
+
+/* ---------- examples и UI ---------- */
+const defaultPairs = [
+  ["Привет","Привет! Я оффлайн-бот. Как могу помочь?"],
+  ["Здравствуй","Привет! Чем помочь?"],
+  ["Как дела","Хорошо, спасибо! У тебя как?"],
+  ["Пока","Пока! Возвращайся, если что."],
+  ["Расскажи шутку","Почему программист не тонет? Потому что он использует float!"]
+];
+
+function loadExamples(){
+  // парсинг textarea
+  let raw = document.getElementById('pairsInput').value.trim();
+  let pairs = [];
+  if(!raw){ // если пусто — загрузим дефолт
+    pairs = defaultPairs;
+    document.getElementById('pairsInput').value = pairs.map(p=>p.join('║')).join('\n');
+  } else {
+    for(let line of raw.split('\n')){
+      let parts = line.split('║');
+      if(parts.length>=2){ pairs.push([parts[0].trim(), parts.slice(1).join('║').trim()]); }
+    }
+  }
+  responses = [];
+  dataset = [];
+  for(let i=0;i<pairs.length;i++){
+    let [q,a] = pairs[i];
+    let rid = responses.indexOf(a);
+    if(rid===-1){ responses.push(a); rid = responses.length-1; }
+    dataset.push({in: q, outIdx: rid});
+  }
+  initModel();
+  renderResponses();
+  setStatus('Примеры загружены: '+dataset.length+' пар, '+responses.length+' ответов');
+}
+
+function saveExamples(){
+  // сохраняем textarea как пары и сбрасываем модель
+  let raw = document.getElementById('pairsInput').value.trim();
+  if(!raw){ alert('Текст пустой — сначала добавь примеры или нажми Load default'); return; }
+  loadExamples();
+  saveState();
+  alert('Примеры сохранены в localStorage');
+}
+
+function renderResponses(){
+  let el = document.getElementById('responsesList'); el.innerHTML = '';
+  for(let i=0;i<responses.length;i++){
+    let d = document.createElement('div'); d.className='example';
+    d.innerHTML = `<div style="flex:1"><strong>#${i}</strong> ${escapeHtml(responses[i])}</div>
+                   <div class="row"><button onclick="removeResponse(${i})">удалить</button></div>`;
+    el.appendChild(d);
+  }
+}
+
+function removeResponse(i){
+  if(!confirm('Удалить ответ #'+i+' ?')) return;
+  responses.splice(i,1);
+  // обновим индексы в dataset (если удалили, переназначим к 0)
+  for(let d of dataset) if(d.outIdx>=responses.length) d.outIdx = 0;
+  initModel();
+  saveState();
+}
+
+/* UI: чат */
+function appendMessage(who, text){
+  let box = document.getElementById('messages');
+  let m = document.createElement('div'); m.className='msg '+(who==='me'?'me':'bot');
+  m.innerHTML = (who==='me'?'<b>Ты:</b> ':'<b>Бот:</b> ')+escapeHtml(text);
+  box.appendChild(m);
+  box.scrollTop = box.scrollHeight;
+}
+function escapeHtml(s){ return s.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'); }
+
+async function send(){
+  let input = document.getElementById('userInput');
+  let text = input.value.trim(); if(!text) return;
+  appendMessage('me', text);
+  input.value='';
+
+  // predict
+  let p = predict(text);
+  let reply = '...';
+  if(p.index>=0 && p.prob>0.45){
+    reply = responses[p.index] || '...';
+    appendMessage('bot', reply + ` <span class="conf">(${(p.prob*100).toFixed(0)}%)</span>`);
+  } else {
+    // fallback nearest
+    let near = nearestExample(text);
+    if(near && near.sim>0.45){
+      let idx = dataset[near.idx].outIdx;
+      reply = responses[idx];
+      appendMessage('bot', reply + ` <span class="conf">(fuzzy ${(near.sim*100).toFixed(0)}%)</span>`);
+    } else {
+      appendMessage('bot', "Не уверен, дай пример для тренировки (в панели справа).");
+    }
+  }
+}
+
+/* training UI */
+async function trainFromUI(){
+  let ep = parseInt(document.getElementById('epochs').value||'100');
+  let lr = parseFloat(document.getElementById('lr').value||'0.12');
+  document.getElementById('trainLog').innerText = 'Старт обучения...';
+  await train(ep, lr, (msg)=>{ document.getElementById('trainLog').innerText = msg; });
+  saveState();
+}
+
+/* очистка чата */
+function clearChat(){ document.getElementById('messages').innerHTML=''; }
+
+/* перезапустить модель */
+function resetModel(){ if(confirm('Переинициализировать веса модели?')) initModel(); }
+
+/* загрузка при старте */
+if(!loadState()){
+  // если нет сохранённого — загрузить дефолтные примеры
+  document.getElementById('pairsInput').value = defaultPairs.map(p=>p.join('║')).join('\n');
+  loadExamples();
+  // немного натренируем автоматически
+  (async ()=>{ setStatus('Автообучение на дефолтных примерах...'); await train(120,0.12,(m)=>setStatus(m)); saveState(); setStatus('Готов — базовое автообучение завершено'); })();
+} else {
+  // загружено — если модель пустая, инициализируем
+  if(!model.W1) initModel();
+}
+
+/* helpers */
+function setStatus(s){ document.getElementById('status').innerText = s }
+
+/* безопасный сброс localStorage (не по умолчанию) */
+// function clearStorage(){ localStorage.removeItem(STORAGE_KEY); alert('Storage cleared'); }
+
+</script>
+</body>
+</html>
