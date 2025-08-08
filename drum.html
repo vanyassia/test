@@ -1,0 +1,742 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Virtual Drum Set</title>
+<style>
+  :root{
+    --bg:#0b0f14;
+    --panel:#0f1720;
+    --accent:#ff6b6b;
+    --accent2:#6be3ff;
+    --text:#e6eef6;
+    --glass: rgba(255,255,255,0.03);
+  }
+  *{box-sizing:border-box;font-family:Inter,ui-sans-serif,system-ui,Arial,Helvetica,sans-serif}
+  body{margin:0;min-height:100vh;background:
+    radial-gradient(1200px 600px at 10% 10%, rgba(107,227,255,0.04), transparent 10%),
+    radial-gradient(900px 500px at 95% 90%, rgba(255,107,107,0.03), transparent 10%),
+    var(--bg); color:var(--text); display:flex;align-items:center;justify-content:center;padding:24px;}
+  .app{width:100%;max-width:1100px;background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent 30%); border-radius:16px;padding:18px;box-shadow: 0 20px 60px rgba(0,0,0,0.6); }
+  header{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:12px}
+  h1{margin:0;font-size:20px;letter-spacing:0.6px}
+  .controls{display:flex;gap:10px;align-items:center}
+  button{background:var(--panel);border:1px solid rgba(255,255,255,0.03);color:var(--text);padding:8px 12px;border-radius:8px;cursor:pointer}
+  button.primary{background:linear-gradient(90deg,var(--accent),#ff9b9b);color:#111;font-weight:600}
+  .pad-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;padding:12px 0;}
+  .pad{background:var(--glass);height:110px;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;border:1px solid rgba(255,255,255,0.03);cursor:pointer;user-select:none;overflow:hidden;transition:transform .06s ease}
+  .pad:active{transform:scale(.98)}
+  .pad .key{position:absolute;right:8px;top:8px;font-size:12px;opacity:.6}
+  .pad .label{font-size:16px;font-weight:600}
+  .pad.hit{box-shadow: 0 6px 30px rgba(255,107,107,0.12); transform:scale(1.04); }
+  .led{position:absolute;left:8px;top:8px;width:10px;height:10px;border-radius:6px;background:rgba(255,255,255,0.06)}
+  .meter{display:flex;gap:6px;align-items:center}
+  input[type=range]{width:140px}
+  .rec-indicator{display:inline-block;width:10px;height:10px;border-radius:50%;background:#333;margin-right:8px;box-shadow:none}
+  .rec-indicator.live{background:var(--accent);box-shadow:0 0 10px var(--accent)}
+  footer{display:flex;justify-content:space-between;align-items:center;margin-top:12px;font-size:13px;opacity:.9}
+  .small{font-size:12px;opacity:.8}
+  .file-input{display:none}
+  .pads-row{display:flex;gap:12px}
+  .vis{
+    position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent);
+  }
+  .pad .pulse{
+    position:absolute;left:50%;top:50%;width:20px;height:20px;background:radial-gradient(circle,#fff4 2%, transparent 40%);opacity:0;transform:translate(-50%,-50%) scale(1);
+    transition:opacity .12s ease, transform .18s ease;
+  }
+  .pad.hit .pulse{opacity:.12;transform:translate(-50%,-50%) scale(6)}
+  .top-row{display:flex;gap:12px;align-items:center}
+  .download-link{color:var(--accent2);text-decoration:underline;cursor:pointer}
+  .tempo{display:flex;align-items:center;gap:8px}
+  .metronome-toggle{display:flex;gap:8px;align-items:center}
+  .export-btn{background:linear-gradient(90deg,var(--accent2),#9ef3ff);color:#022}
+  .help{opacity:.85}
+  @media (max-width:720px){
+    .pad{height:86px}
+    .pad-grid{grid-template-columns:repeat(2,1fr)}
+  }
+</style>
+</head>
+<body>
+  <div class="app" role="application" aria-label="Virtual drum set">
+    <header>
+      <div>
+        <h1>🔥 Virtual Drum Set</h1>
+        <div class="small help">Click pads or press keys <strong>A S D F G H J K</strong>. Record and export WAV.</div>
+      </div>
+      <div class="controls">
+        <button id="startAudio" class="primary">Start Audio</button>
+        <div class="metronome-toggle">
+          <label class="small">Metronome</label>
+          <input type="checkbox" id="metToggle" />
+        </div>
+        <div class="tempo">
+          <label class="small">BPM</label>
+          <input id="bpm" type="range" min="60" max="160" value="100"/>
+          <span id="bpmVal">100</span>
+        </div>
+      </div>
+    </header>
+
+    <section>
+      <div class="top-row" style="margin-bottom:12px;align-items:center;justify-content:space-between">
+        <div style="display:flex;gap:8px;align-items:center">
+          <button id="recBtn">● Record</button>
+          <button id="playBtn">▶ Play</button>
+          <button id="stopBtn">■ Stop</button>
+          <label class="small" style="margin-left:8px">Overdub <input type="checkbox" id="overdub" checked /></label>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button id="saveJson">Save JSON</button>
+          <input id="fileInput" class="file-input" type="file" accept="application/json"/>
+          <button id="loadJson">Load JSON</button>
+          <button id="exportWav" class="export-btn">Export WAV</button>
+        </div>
+      </div>
+
+      <div class="pad-grid" id="pads">
+        <!-- pads generated by JS -->
+      </div>
+
+      <div style="display:flex;gap:12px;align-items:center;margin-top:12px">
+        <div class="meter">
+          <div id="recLed" class="rec-indicator"></div>
+          <div class="small">Status: <span id="status">Idle</span></div>
+        </div>
+        <div class="small">Volume <input id="masterVol" type="range" min="0" max="1" step="0.01" value="0.8" /></div>
+      </div>
+    </section>
+
+    <footer>
+      <div class="small">Mapping: A=Kick S=Snare D=HiHat F=Tom1 G=Tom2 H=Crash J=Clap K=Perc</div>
+      <div class="small">Made with WebAudio • No samples — synth drums</div>
+    </footer>
+  </div>
+
+<script>
+/* Virtual Drum Set - single file
+   Features:
+   - Synthesized drum sounds
+   - Click / keyboard input
+   - Record/play/overdub
+   - Export JSON & WAV
+   - Metronome & BPM
+*/
+(() => {
+  const padsDef = [
+    { id:'kick', label:'Kick', key:'A' },
+    { id:'snare', label:'Snare', key:'S' },
+    { id:'hihat', label:'Hi-Hat', key:'D' },
+    { id:'tom1', label:'Tom 1', key:'F' },
+    { id:'tom2', label:'Tom 2', key:'G' },
+    { id:'crash', label:'Crash', key:'H' },
+    { id:'clap', label:'Clap', key:'J' },
+    { id:'perc', label:'Perc', key:'K' },
+  ];
+
+  // UI refs
+  const padsEl = document.getElementById('pads');
+  const statusEl = document.getElementById('status');
+  const recBtn = document.getElementById('recBtn');
+  const playBtn = document.getElementById('playBtn');
+  const stopBtn = document.getElementById('stopBtn');
+  const recLed = document.getElementById('recLed');
+  const bpmSlider = document.getElementById('bpm');
+  const bpmVal = document.getElementById('bpmVal');
+  const metToggle = document.getElementById('metToggle');
+  const masterVol = document.getElementById('masterVol');
+  const startAudioBtn = document.getElementById('startAudio');
+  const overdubCheckbox = document.getElementById('overdub');
+  const saveJsonBtn = document.getElementById('saveJson');
+  const loadJsonBtn = document.getElementById('loadJson');
+  const fileInput = document.getElementById('fileInput');
+  const exportWavBtn = document.getElementById('exportWav');
+
+  // audio
+  let audioCtx = null;
+  let masterGain = null;
+  let isStarted = false;
+
+  function ensureAudio() {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      masterGain = audioCtx.createGain();
+      masterGain.gain.value = Number(masterVol.value);
+      masterGain.connect(audioCtx.destination);
+    }
+  }
+
+  startAudioBtn.addEventListener('click', () => {
+    if (!isStarted) {
+      ensureAudio();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      isStarted = true;
+      startAudioBtn.textContent = 'Audio Ready';
+      startAudioBtn.disabled = true;
+    }
+  });
+
+  masterVol.addEventListener('input', ()=> {
+    if(masterGain) masterGain.gain.value = Number(masterVol.value);
+  });
+
+  // build UI pads
+  padsDef.forEach(def => {
+    const el = document.createElement('div');
+    el.className = 'pad';
+    el.dataset.id = def.id;
+    el.innerHTML = `<div class="led"></div><div class="key">${def.key}</div><div class="label">${def.label}</div><div class="pulse"></div>`;
+    padsEl.appendChild(el);
+    el.addEventListener('pointerdown', (e)=>{ e.preventDefault(); triggerPad(def.id); });
+  });
+
+  // keyboard mapping
+  const keyMap = {};
+  padsDef.forEach(p => keyMap[p.key.toLowerCase()] = p.id);
+  window.addEventListener('keydown', (e) => {
+    if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')) return;
+    const key = e.key.toLowerCase();
+    if (keyMap[key]) {
+      e.preventDefault();
+      triggerPad(keyMap[key]);
+    }
+  });
+
+  // visual hit
+  function flashPad(id){
+    const el = document.querySelector(`.pad[data-id="${id}"]`);
+    if (!el) return;
+    el.classList.add('hit');
+    setTimeout(()=>el.classList.remove('hit'), 160);
+  }
+
+  // simple drum synths
+  function playKick(time=0, when=0, dest=masterGain) {
+    if(!audioCtx) return;
+    const t = (time || audioCtx.currentTime) + when;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(150, t);
+    osc.frequency.exponentialRampToValueAtTime(50, t+0.15);
+    gain.gain.setValueAtTime(1, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t+0.4);
+    osc.connect(gain);
+    gain.connect(dest);
+    osc.start(t);
+    osc.stop(t+0.5);
+  }
+
+  function playSnare(time=0, when=0, dest=masterGain) {
+    if(!audioCtx) return;
+    const t = (time || audioCtx.currentTime) + when;
+    // noise part
+    const bufferSize = audioCtx.sampleRate * 0.2;
+    const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const data = noiseBuffer.getChannelData(0);
+    for (let i=0;i<bufferSize;i++) data[i] = (Math.random()*2-1) * (1 - i/bufferSize);
+    const noise = audioCtx.createBufferSource();
+    noise.buffer = noiseBuffer;
+    const noiseFilter = audioCtx.createBiquadFilter();
+    noiseFilter.type = 'highpass';
+    noiseFilter.frequency.value = 1000;
+    const noiseGain = audioCtx.createGain();
+    noiseGain.gain.setValueAtTime(1, t);
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, t+0.25);
+    noise.connect(noiseFilter);
+    noiseFilter.connect(noiseGain);
+    noiseGain.connect(dest);
+    noise.start(t);
+    noise.stop(t+0.3);
+
+    // tone
+    const osc = audioCtx.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(200, t);
+    const toneGain = audioCtx.createGain();
+    toneGain.gain.setValueAtTime(0.8, t);
+    toneGain.gain.exponentialRampToValueAtTime(0.001, t+0.18);
+    osc.connect(toneGain);
+    toneGain.connect(dest);
+    osc.start(t);
+    osc.stop(t+0.2);
+  }
+
+  function playHiHat(time=0, when=0, dest=masterGain, closed=true) {
+    if(!audioCtx) return;
+    const t = (time || audioCtx.currentTime) + when;
+    const length = closed ? 0.08 : 0.4;
+    const bufferSize = Math.floor(audioCtx.sampleRate * length);
+    const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const data = noiseBuffer.getChannelData(0);
+    for (let i=0;i<bufferSize;i++){
+      data[i] = (Math.random()*2-1) * Math.pow(1 - i/bufferSize, 2);
+    }
+    const src = audioCtx.createBufferSource();
+    src.buffer = noiseBuffer;
+    const band = audioCtx.createBiquadFilter();
+    band.type = 'highpass';
+    band.frequency.value = 7000;
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(1, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t+length);
+    src.connect(band);
+    band.connect(gain);
+    gain.connect(dest);
+    src.start(t);
+    src.stop(t+length+0.02);
+  }
+
+  function playTom(time=0, when=0, dest=masterGain, pitch=180) {
+    if(!audioCtx) return;
+    const t = (time || audioCtx.currentTime) + when;
+    const osc = audioCtx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(pitch, t);
+    osc.frequency.exponentialRampToValueAtTime(pitch*0.6, t+0.25);
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(1, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t+0.6);
+    osc.connect(gain);
+    gain.connect(dest);
+    osc.start(t);
+    osc.stop(t+0.8);
+  }
+
+  function playCrash(time=0, when=0, dest=masterGain) {
+    if(!audioCtx) return;
+    const t = (time || audioCtx.currentTime) + when;
+    const len = 1.2;
+    const bufferSize = audioCtx.sampleRate * len;
+    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i=0;i<bufferSize;i++){
+      const env = Math.pow(1 - i/bufferSize, 2);
+      data[i] = (Math.random()*2-1) * env * (0.6 + 0.4*Math.sin(i/1000));
+    }
+    const src = audioCtx.createBufferSource();
+    src.buffer = buffer;
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.value = 8000;
+    filter.Q.value = 0.8;
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(0.8, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t+len);
+    src.connect(filter);
+    filter.connect(gain);
+    gain.connect(dest);
+    src.start(t);
+    src.stop(t+len+0.1);
+  }
+
+  function playClap(time=0, when=0, dest=masterGain) {
+    if(!audioCtx) return;
+    const t = (time || audioCtx.currentTime) + when;
+    const makeNoiseBurst = (offset) => {
+      const len = 0.12;
+      const bufferSize = Math.floor(audioCtx.sampleRate * len);
+      const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+      const data = noiseBuffer.getChannelData(0);
+      for (let i=0;i<bufferSize;i++) data[i] = (Math.random()*2-1) * (1 - i/bufferSize);
+      const src = audioCtx.createBufferSource();
+      src.buffer = noiseBuffer;
+      const band = audioCtx.createBiquadFilter();
+      band.type = 'highpass';
+      band.frequency.value = 1500;
+      const gain = audioCtx.createGain();
+      gain.gain.setValueAtTime(0.8, t+offset);
+      gain.gain.exponentialRampToValueAtTime(0.001, t+offset+0.12);
+      src.connect(band);
+      band.connect(gain);
+      gain.connect(dest);
+      src.start(t+offset);
+      src.stop(t+offset+0.13);
+    };
+    makeNoiseBurst(0);
+    makeNoiseBurst(0.015);
+    makeNoiseBurst(0.03);
+  }
+
+  function playPerc(time=0, when=0, dest=masterGain) {
+    if(!audioCtx) return;
+    const t = (time || audioCtx.currentTime) + when;
+    const osc = audioCtx.createOscillator();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(900, t);
+    osc.frequency.exponentialRampToValueAtTime(400, t+0.12);
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(0.6, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t+0.2);
+    osc.connect(gain);
+    gain.connect(masterGain);
+    osc.start(t);
+    osc.stop(t+0.3);
+  }
+
+  // central trigger
+  function triggerPad(id, timeOffset=0){
+    if(!audioCtx) { /* ignore until user starts audio */ return; }
+    const t = audioCtx.currentTime;
+    switch(id){
+      case 'kick': playKick(t, timeOffset); break;
+      case 'snare': playSnare(t, timeOffset); break;
+      case 'hihat': playHiHat(t, timeOffset, masterGain, true); break;
+      case 'tom1': playTom(t, timeOffset, masterGain, 220); break;
+      case 'tom2': playTom(t, timeOffset, masterGain, 140); break;
+      case 'crash': playCrash(t, timeOffset, masterGain); break;
+      case 'clap': playClap(t, timeOffset, masterGain); break;
+      case 'perc': playPerc(t, timeOffset, masterGain); break;
+    }
+    flashPad(id);
+    // record event if recording
+    if (isRecording) {
+      const now = performance.now();
+      const rel = (now - recordStartTime) / 1000;
+      recorded.push({ id, time: rel });
+    }
+  }
+
+  // recording logic
+  let recorded = []; // array of {id, time}
+  let isRecording = false;
+  let recordStartTime = 0;
+
+  recBtn.addEventListener('click', ()=> {
+    if (!isStarted) {
+      alert('Click "Start Audio" first to enable sound.');
+      return;
+    }
+    if (!isRecording) {
+      // start recording
+      recorded = []; // fresh unless user wants overdub (handled on playback)
+      isRecording = true;
+      recordStartTime = performance.now();
+      recLed.classList.add('live'); statusEl.textContent = 'Recording';
+      recBtn.textContent = '● Stop Rec';
+    } else {
+      isRecording = false;
+      recLed.classList.remove('live'); statusEl.textContent = 'Idle';
+      recBtn.textContent = '● Record';
+    }
+  });
+
+  // play logic
+  let playTimers = [];
+  let isPlaying = false;
+  function clearPlayTimers(){ playTimers.forEach(id=>clearTimeout(id)); playTimers = []; }
+
+  playBtn.addEventListener('click', ()=> {
+    if (!isStarted) { alert('Click "Start Audio" first.'); return; }
+    if (recorded.length === 0) { alert('No recorded beats yet. Hit Record then play some hits.'); return; }
+    startPlayback();
+  });
+
+  stopBtn.addEventListener('click', ()=> stopPlayback());
+
+  function startPlayback(playSpeed=1){
+    if(isPlaying) return;
+    if (!audioCtx) return;
+    isPlaying = true;
+    statusEl.textContent = 'Playing';
+    // schedule metronome if needed
+    const duration = recorded[recorded.length-1].time;
+    const baseBpm = Number(bpmSlider.value);
+    const tempoRatio = baseBpm / 100; // 100 is "original" baseline because time stored raw seconds
+    const multiplier = 100 / baseBpm;
+    const start = performance.now();
+    const startTime = audioCtx.currentTime + 0.06;
+    // schedule recorded events
+    recorded.forEach(ev => {
+      const when = ev.time * (100 / baseBpm);
+      const d = setTimeout(()=> triggerPad(ev.id), Math.max(0, Math.round(when*1000)));
+      playTimers.push(d);
+    });
+    // also handle looping? We'll just one-shot
+    // Stop after last event
+    const stopTimer = setTimeout(()=> { stopPlayback(); }, Math.max(1200, Math.round(recorded[recorded.length-1].time * (100 / baseBpm) * 1000) + 300));
+    playTimers.push(stopTimer);
+  }
+
+  function stopPlayback(){
+    if (!isPlaying) return;
+    clearPlayTimers();
+    isPlaying = false;
+    statusEl.textContent = 'Idle';
+  }
+
+  // Tempo UI
+  bpmSlider.addEventListener('input', ()=> bpmVal.textContent = bpmSlider.value);
+
+  // metronome (simple click)
+  let metInterval = null;
+  function startMetronome(){
+    if (!audioCtx) return;
+    stopMetronome();
+    const bpm = Number(bpmSlider.value);
+    const interval = 60000 / bpm;
+    metInterval = setInterval(()=>{
+      // quick tick: short noise burst
+      const t = audioCtx.currentTime;
+      const osc = audioCtx.createOscillator();
+      osc.type = 'square';
+      osc.frequency.value = 1500;
+      const gain = audioCtx.createGain();
+      gain.gain.setValueAtTime(0.08, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t+0.06);
+      osc.connect(gain); gain.connect(masterGain);
+      osc.start(t);
+      osc.stop(t+0.08);
+    }, interval);
+  }
+  function stopMetronome(){ if (metInterval) { clearInterval(metInterval); metInterval = null; } }
+  metToggle.addEventListener('change', ()=> {
+    if (!isStarted) { metToggle.checked = false; alert('Start audio first'); return; }
+    if (metToggle.checked) startMetronome(); else stopMetronome();
+  });
+  bpmSlider.addEventListener('change', ()=> { if (metToggle.checked) { startMetronome(); } });
+
+  // Save/load JSON
+  saveJsonBtn.addEventListener('click', ()=> {
+    if (recorded.length === 0) { alert('Nothing recorded yet'); return; }
+    const blob = new Blob([JSON.stringify({ bpm: Number(bpmSlider.value), recorded }, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'drumbeats.json'; document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  });
+
+  loadJsonBtn.addEventListener('click', ()=> fileInput.click());
+  fileInput.addEventListener('change', async (ev) => {
+    const f = ev.target.files[0];
+    if (!f) return;
+    try {
+      const txt = await f.text();
+      const data = JSON.parse(txt);
+      if (!Array.isArray(data.recorded)) throw new Error('Invalid file');
+      recorded = data.recorded;
+      if (data.bpm) bpmSlider.value = data.bpm;
+      bpmVal.textContent = bpmSlider.value;
+      alert('Loaded ' + recorded.length + ' events');
+    } catch (e) {
+      alert('Error loading file: ' + e.message);
+    }
+    fileInput.value = '';
+  });
+
+  // WAV export using OfflineAudioContext
+  exportWavBtn.addEventListener('click', async ()=> {
+    if (!isStarted) { alert('Start audio first'); return; }
+    if (recorded.length === 0) { alert('Nothing recorded to export'); return; }
+    try {
+      statusEl.textContent = 'Rendering WAV...';
+      exportWavBtn.disabled = true;
+      await renderAndDownloadWav();
+    } catch(e){ alert('Export failed: ' + e.message); }
+    statusEl.textContent = 'Idle';
+    exportWavBtn.disabled = false;
+  });
+
+  async function renderAndDownloadWav(){
+    // Determine final duration (in seconds)
+    const lastTime = recorded[recorded.length-1].time;
+    const bpm = Number(bpmSlider.value);
+    const durationSec = lastTime * (100 / bpm) + 1.5; // extra tail
+    const sampleRate = 44100;
+    const offline = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, Math.ceil(durationSec * sampleRate), sampleRate);
+
+    // Build a dest gain
+    const offlineGain = offline.createGain();
+    offlineGain.gain.value = Number(masterVol.value);
+    offlineGain.connect(offline.destination);
+
+    // schedule events in offline context
+    recorded.forEach(ev => {
+      const t = ev.time * (100 / bpm);
+      switch(ev.id){
+        case 'kick': scheduleKick(offline, offlineGain, t); break;
+        case 'snare': scheduleSnare(offline, offlineGain, t); break;
+        case 'hihat': scheduleHiHat(offline, offlineGain, t, true); break;
+        case 'tom1': scheduleTom(offline, offlineGain, t, 220); break;
+        case 'tom2': scheduleTom(offline, offlineGain, t, 140); break;
+        case 'crash': scheduleCrash(offline, offlineGain, t); break;
+        case 'clap': scheduleClap(offline, offlineGain, t); break;
+        case 'perc': schedulePerc(offline, offlineGain, t); break;
+      }
+    });
+
+    // Render
+    const rendered = await offline.startRendering();
+    // encode to WAV
+    const wavBlob = encodeWAV(rendered);
+    const url = URL.createObjectURL(wavBlob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'drumbeats.wav';
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  // Offline scheduling functions (same logic but using provided context)
+  function scheduleKick(ctx, dest, t){
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(150, t);
+    osc.frequency.exponentialRampToValueAtTime(50, t+0.15);
+    gain.gain.setValueAtTime(1, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t+0.4);
+    osc.connect(gain);
+    gain.connect(dest);
+    osc.start(t);
+    osc.stop(t+0.5);
+  }
+  function scheduleSnare(ctx, dest, t){
+    const len = 0.3;
+    // noise
+    const bufferSize = ctx.sampleRate * len;
+    const noiseBuf = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = noiseBuf.getChannelData(0);
+    for(let i=0;i<bufferSize;i++) data[i] = (Math.random()*2-1) * (1 - i/bufferSize);
+    const src = ctx.createBufferSource();
+    src.buffer = noiseBuf;
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'highpass'; filter.frequency.value = 1000;
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(1, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t+0.25);
+    src.connect(filter); filter.connect(gain); gain.connect(dest);
+    src.start(t); src.stop(t+len);
+    // tone
+    const osc = ctx.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(200, t);
+    const gain2 = ctx.createGain();
+    gain2.gain.setValueAtTime(0.8, t);
+    gain2.gain.exponentialRampToValueAtTime(0.001, t+0.18);
+    osc.connect(gain2); gain2.connect(dest);
+    osc.start(t); osc.stop(t+0.22);
+  }
+  function scheduleHiHat(ctx, dest, t, closed=true){
+    const len = closed ? 0.08 : 0.4;
+    const bufferSize = Math.floor(ctx.sampleRate * len);
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i=0;i<bufferSize;i++) data[i] = (Math.random()*2-1) * Math.pow(1 - i/bufferSize, 2);
+    const src = ctx.createBufferSource(); src.buffer = buffer;
+    const band = ctx.createBiquadFilter(); band.type='highpass'; band.frequency.value=7000;
+    const gain = ctx.createGain(); gain.gain.setValueAtTime(1, t); gain.gain.exponentialRampToValueAtTime(0.001, t+len);
+    src.connect(band); band.connect(gain); gain.connect(dest);
+    src.start(t); src.stop(t+len+0.02);
+  }
+  function scheduleTom(ctx, dest, t, pitch=180){
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(pitch, t);
+    osc.frequency.exponentialRampToValueAtTime(pitch*0.6, t+0.25);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(1, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t+0.6);
+    osc.connect(gain); gain.connect(dest);
+    osc.start(t); osc.stop(t+0.8);
+  }
+  function scheduleCrash(ctx, dest, t){
+    const len = 1.2;
+    const bufferSize = ctx.sampleRate * len;
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i=0;i<bufferSize;i++){
+      const env = Math.pow(1 - i/bufferSize, 2);
+      data[i] = (Math.random()*2-1) * env * (0.6 + 0.4*Math.sin(i/1000));
+    }
+    const src = ctx.createBufferSource(); src.buffer = buffer;
+    const filter = ctx.createBiquadFilter(); filter.type='bandpass'; filter.frequency.value=8000; filter.Q.value = 0.8;
+    const gain = ctx.createGain(); gain.gain.setValueAtTime(0.8, t); gain.gain.exponentialRampToValueAtTime(0.001, t+len);
+    src.connect(filter); filter.connect(gain); gain.connect(dest);
+    src.start(t); src.stop(t+len+0.1);
+  }
+  function scheduleClap(ctx, dest, t){
+    const makeBurst = (offset) => {
+      const len = 0.12; const bufferSize = Math.floor(ctx.sampleRate * len);
+      const buf = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i=0;i<bufferSize;i++) d[i] = (Math.random()*2-1) * (1 - i/bufferSize);
+      const src = ctx.createBufferSource(); src.buffer = buf;
+      const band = ctx.createBiquadFilter(); band.type='highpass'; band.frequency.value=1500;
+      const gain = ctx.createGain(); gain.gain.setValueAtTime(0.8, t+offset); gain.gain.exponentialRampToValueAtTime(0.001, t+offset+0.12);
+      src.connect(band); band.connect(gain); gain.connect(dest);
+      src.start(t+offset); src.stop(t+offset+0.13);
+    };
+    makeBurst(0); makeBurst(0.015); makeBurst(0.03);
+  }
+  function schedulePerc(ctx, dest, t){
+    const osc = ctx.createOscillator();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(900, t);
+    osc.frequency.exponentialRampToValueAtTime(400, t+0.12);
+    const gain = ctx.createGain(); gain.gain.setValueAtTime(0.6, t); gain.gain.exponentialRampToValueAtTime(0.001, t+0.2);
+    osc.connect(gain); gain.connect(dest);
+    osc.start(t); osc.stop(t+0.3);
+  }
+
+  // WAV encoder for OfflineAudioContext rendered buffer
+  function encodeWAV(renderedBuffer){
+    const channelData = renderedBuffer.getChannelData(0);
+    const sampleRate = renderedBuffer.sampleRate;
+    const bytesPerSample = 2;
+    const blockAlign = bytesPerSample * 1;
+    const buffer = new ArrayBuffer(44 + channelData.length * bytesPerSample);
+    const view = new DataView(buffer);
+
+    function writeString(view, offset, string){
+      for (let i = 0; i < string.length; i++){
+        view.setUint8(offset + i, string.charCodeAt(i));
+      }
+    }
+    let offset = 0;
+    writeString(view, offset, 'RIFF'); offset += 4;
+    view.setUint32(offset, 36 + channelData.length * bytesPerSample, true); offset += 4;
+    writeString(view, offset, 'WAVE'); offset += 4;
+    writeString(view, offset, 'fmt '); offset += 4;
+    view.setUint32(offset, 16, true); offset += 4;
+    view.setUint16(offset, 1, true); offset += 2; // PCM
+    view.setUint16(offset, 1, true); offset += 2; // channels
+    view.setUint32(offset, sampleRate, true); offset += 4;
+    view.setUint32(offset, sampleRate * blockAlign, true); offset += 4;
+    view.setUint16(offset, blockAlign, true); offset += 2;
+    view.setUint16(offset, bytesPerSample * 8, true); offset += 2;
+    writeString(view, offset, 'data'); offset += 4;
+    view.setUint32(offset, channelData.length * bytesPerSample, true); offset += 4;
+
+    // PCM16
+    let idx = 0;
+    for (let i=0;i<channelData.length;i++, idx += 2){
+      let s = Math.max(-1, Math.min(1, channelData[i]));
+      view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+      offset += 2;
+    }
+
+    return new Blob([view], { type: 'audio/wav' });
+  }
+
+  // keep UI alive by listening for pad events and flash
+  // Also implement small animation on recorded hits during playback
+  // No extra code required.
+
+  // friendly tips UI
+  statusEl.textContent = 'Idle';
+
+  // quick demo: populate with a tiny pattern to play if desired (commented)
+  // recorded = [{id:'kick',time:0},{id:'hihat',time:0.25},{id:'snare',time:0.5},{id:'hihat',time:0.75}];
+
+  // show pad key labels also clickable
+  // done earlier
+
+  // prevent accidental drag selection
+  document.addEventListener('selectstart', e => { if (e.target.classList.contains('pad')) e.preventDefault(); });
+
+})();
+</script>
+</body>
+</html>
