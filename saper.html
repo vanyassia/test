@@ -1,0 +1,1626 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minesweeper Premium</title>
+    <style>
+        /*
+         * =================================================================
+         * ARCHITECTURE & CODE STYLE:
+         * --------------------------
+         * 1. Single HTML File: All CSS and JavaScript are contained within
+         *    this single file. No external dependencies.
+         * 2. CSS Variables: Theming (Light/Dark) and layout properties are
+         *    controlled by CSS variables for easy customization and switching.
+         * 3. BEM-like Naming: A BEM-like convention is used for CSS classes
+         *    to maintain a clear and modular structure.
+         * 4. Accessibility First: The design and implementation prioritize
+         *    accessibility standards (WCAG).
+         * =================================================================
+        */
+
+        :root {
+            --font-main: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+            
+            --hue: 210;
+            --saturation-base: 15%;
+            --saturation-accent: 85%;
+            --lightness-base: 98%;
+            --lightness-accent: 60%;
+
+            --c-bg: hsl(var(--hue), var(--saturation-base), var(--lightness-base));
+            --c-surface-1: hsl(var(--hue), var(--saturation-base), 95%);
+            --c-surface-2: hsl(var(--hue), var(--saturation-base), 92%);
+            --c-text-primary: hsl(var(--hue), 10%, 15%);
+            --c-text-secondary: hsl(var(--hue), 10%, 40%);
+            --c-border: hsl(var(--hue), 15%, 85%);
+            --c-accent: hsl(var(--hue), var(--saturation-accent), var(--lightness-accent));
+            --c-accent-contrast: hsl(0, 0%, 100%);
+            --c-danger: hsl(0, 70%, 55%);
+            --c-success: hsl(145, 63%, 42%);
+            --c-cell-hidden-bg: hsl(var(--hue), 20%, 90%);
+            --c-cell-revealed-bg: hsl(var(--hue), 20%, 82%);
+            --c-shadow: hsl(var(--hue), 40%, 50%, 0.1);
+
+            --shadow-sm: 0 1px 2px 0 var(--c-shadow);
+            --shadow-md: 0 4px 6px -1px var(--c-shadow), 0 2px 4px -2px var(--c-shadow);
+            --shadow-lg: 0 10px 15px -3px var(--c-shadow), 0 4px 6px -4px var(--c-shadow);
+            --radius-sm: 0.3rem;
+            --radius-md: 0.5rem;
+            --radius-lg: 0.8rem;
+            --transition-speed: 0.2s;
+        }
+
+        .dark-theme {
+            --hue: 220;
+            --saturation-base: 10%;
+            --saturation-accent: 70%;
+            --lightness-base: 12%;
+
+            --c-bg: hsl(var(--hue), var(--saturation-base), var(--lightness-base));
+            --c-surface-1: hsl(var(--hue), var(--saturation-base), 18%);
+            --c-surface-2: hsl(var(--hue), var(--saturation-base), 22%);
+            --c-text-primary: hsl(var(--hue), 15%, 85%);
+            --c-text-secondary: hsl(var(--hue), 10%, 60%);
+            --c-border: hsl(var(--hue), 15%, 28%);
+            --c-accent: hsl(var(--hue), var(--saturation-accent), var(--lightness-accent));
+            --c-cell-hidden-bg: hsl(var(--hue), 10%, 25%);
+            --c-cell-revealed-bg: hsl(var(--hue), 10%, 20%);
+            --c-shadow: hsl(var(--hue), 50%, 2%, 0.2);
+        }
+
+        /* Color definitions for cell numbers */
+        [data-value="1"] { --value-color: #0000ff; }
+        [data-value="2"] { --value-color: #008000; }
+        [data-value="3"] { --value-color: #ff0000; }
+        [data-value="4"] { --value-color: #000080; }
+        [data-value="5"] { --value-color: #800000; }
+        [data-value="6"] { --value-color: #008080; }
+        [data-value="7"] { --value-color: #000000; }
+        [data-value="8"] { --value-color: #808080; }
+        .dark-theme [data-value="1"] { --value-color: #58a6ff; }
+        .dark-theme [data-value="2"] { --value-color: #55d484; }
+        .dark-theme [data-value="3"] { --value-color: #ff7b72; }
+        .dark-theme [data-value="4"] { --value-color: #a2a2ff; }
+        .dark-theme [data-value="5"] { --value-color: #d18a8a; }
+        .dark-theme [data-value="6"] { --value-color: #67c2c2; }
+        .dark-theme [data-value="7"] { --value-color: #b0b0b0; }
+        .dark-theme [data-value="8"] { --value-color: #8d8d8d; }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+                scroll-behavior: auto !important;
+            }
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        @keyframes slideInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes popIn {
+             0% { transform: scale(0.6); opacity: 0; }
+             60% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        
+        @keyframes explosion {
+            0% { transform: scale(1); opacity: 1; border-radius: 20%; }
+            100% { transform: scale(1.5); opacity: 0; border-radius: 50%; }
+        }
+        
+        @keyframes victory-reveal {
+            0% { transform: scale(1); opacity: 1; }
+            100% { transform: scale(0.95); opacity: 0.8; }
+        }
+
+        html {
+            box-sizing: border-box;
+            font-size: 16px;
+        }
+        
+        *, *:before, *:after {
+            box-sizing: inherit;
+        }
+
+        body {
+            margin: 0;
+            padding: 1rem;
+            font-family: var(--font-main);
+            background-color: var(--c-bg);
+            color: var(--c-text-primary);
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            transition: background-color var(--transition-speed) ease, color var(--transition-speed) ease;
+        }
+        
+        .game-container {
+            width: 100%;
+            max-width: 1200px;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        .header-panel {
+            background-color: var(--c-surface-1);
+            padding: 1rem 1.5rem;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--c-border);
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            transition: background-color var(--transition-speed) ease, border-color var(--transition-speed) ease;
+        }
+        
+        .header-panel__title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin: 0;
+            color: var(--c-text-primary);
+        }
+        
+        .header-panel__controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            align-items: center;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 0.6rem 1.2rem;
+            font-family: inherit;
+            font-size: 0.95rem;
+            font-weight: 500;
+            border: 1px solid var(--c-border);
+            border-radius: var(--radius-md);
+            background-color: var(--c-surface-2);
+            color: var(--c-text-primary);
+            cursor: pointer;
+            transition: all var(--transition-speed) ease;
+            position: relative;
+            overflow: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        .btn:hover, .btn:focus-visible {
+            border-color: var(--c-accent);
+            color: var(--c-accent);
+            background-color: hsl(var(--hue), var(--saturation-accent), 95%);
+        }
+        .dark-theme .btn:hover, .dark-theme .btn:focus-visible {
+             background-color: hsla(var(--hue), var(--saturation-accent), 50%, 0.1);
+        }
+        
+        .btn:active {
+            transform: translateY(1px);
+        }
+        
+        .btn__icon {
+            width: 1.2em;
+            height: 1.2em;
+        }
+
+        .btn--primary {
+            background-color: var(--c-accent);
+            color: var(--c-accent-contrast);
+            border-color: var(--c-accent);
+        }
+        .btn--primary:hover, .btn--primary:focus-visible {
+            background-color: hsl(var(--hue), var(--saturation-accent), calc(var(--lightness-accent) + 5%));
+            color: var(--c-accent-contrast);
+            border-color: hsl(var(--hue), var(--saturation-accent), calc(var(--lightness-accent) + 5%));
+        }
+
+        .btn--icon-only {
+            padding: 0.6rem;
+        }
+        
+        .select-wrapper {
+            position: relative;
+        }
+        
+        .select-wrapper::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            right: 0.8rem;
+            transform: translateY(-50%);
+            width: 0.6em;
+            height: 0.4em;
+            background-color: var(--c-text-secondary);
+            clip-path: polygon(100% 0%, 0 0%, 50% 100%);
+            pointer-events: none;
+            transition: background-color var(--transition-speed) ease;
+        }
+
+        .select {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            padding: 0.6rem 2.2rem 0.6rem 1rem;
+        }
+        
+        .status-panel {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.5rem;
+            background-color: var(--c-surface-1);
+            padding: 1rem 1.5rem;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--c-border);
+            text-align: center;
+            transition: background-color var(--transition-speed) ease, border-color var(--transition-speed) ease;
+        }
+        
+        .status-panel__item {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+            animation: slideInUp 0.5s ease-out;
+            animation-fill-mode: both;
+        }
+        
+        .status-panel__item:nth-child(2) { animation-delay: 0.1s; }
+        .status-panel__item:nth-child(3) { animation-delay: 0.2s; }
+        
+        .status-panel__label {
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--c-text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        .status-panel__value {
+            font-size: 1.75rem;
+            font-weight: 600;
+            color: var(--c-text-primary);
+            line-height: 1.2;
+        }
+        
+        .game-board__wrapper {
+            background-color: var(--c-surface-1);
+            padding: 1.5rem;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--c-border);
+            overflow: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .game-board {
+            /* 
+             * =================================================================
+             * PERFORMANCE: Canvas vs DOM Grid
+             * ---------------------------------
+             * A DOM-based grid is chosen here over Canvas.
+             * Rationale:
+             * 1. Accessibility: DOM elements (`<button>`) are inherently
+             *    accessible. They can be focused, labeled with ARIA, and are
+             *    natively understood by screen readers. Replicating this
+             *    level of accessibility with Canvas is significantly more
+             *    complex (requiring a parallel DOM or complex focus management).
+             * 2. Simplicity of Interaction: Event handling (click, right-click,
+             *    focus) is trivial with DOM elements.
+             * 3. Performance Sufficiency: For grids up to ~100x100, modern
+             *    browsers handle the DOM manipulation and rendering very
+             *    efficiently. The performance gain from Canvas is negligible
+             *    for most use cases and doesn't justify the accessibility trade-off.
+             * CSS Grid is used for layout, which is highly optimized for this
+             * type of two-dimensional arrangement.
+             * =================================================================
+            */
+            display: grid;
+            gap: 3px;
+            user-select: none;
+            touch-action: manipulation; /* Improves touch responsiveness */
+            margin: 0 auto;
+        }
+        
+        .cell {
+            --cell-size: 2.2rem;
+            width: var(--cell-size);
+            height: var(--cell-size);
+            background-color: var(--c-cell-hidden-bg);
+            border: 1px solid transparent;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: calc(var(--cell-size) * 0.6);
+            font-weight: 700;
+            color: var(--value-color);
+            transition: background-color 0.15s ease, transform 0.1s ease, border-color 0.15s ease;
+            position: relative;
+            padding: 0; /* for <button> reset */
+        }
+        
+        .cell:focus {
+             outline: none;
+        }
+        .cell:focus-visible {
+            outline: 2px solid var(--c-accent);
+            outline-offset: 2px;
+            z-index: 10;
+        }
+
+        .cell:not(.cell--revealed):hover {
+            background-color: hsl(var(--hue), 20%, 95%);
+        }
+        .dark-theme .cell:not(.cell--revealed):hover {
+            background-color: hsl(var(--hue), 10%, 30%);
+        }
+        
+        .cell.cell--revealed {
+            background-color: var(--c-cell-revealed-bg);
+            cursor: default;
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        
+        .cell.cell--flagged .cell__icon,
+        .cell.cell--question .cell__icon {
+            display: block;
+            animation: popIn 0.2s ease;
+        }
+        
+        .cell__icon {
+            width: 60%;
+            height: 60%;
+            display: none;
+        }
+        
+        .cell--mine-hit {
+            background-color: var(--c-danger);
+            animation: explosion 0.5s forwards ease-out;
+        }
+        
+        .cell--mine-hit .cell__icon {
+            filter: invert(1);
+        }
+        
+        .cell--victory {
+            animation: victory-reveal 0.5s ease;
+            background-color: var(--c-success);
+        }
+
+        /* Responsive cell size */
+        @media (max-width: 768px) {
+            .cell { --cell-size: 1.8rem; }
+            .game-board { gap: 2px; }
+        }
+        @media (max-width: 480px) {
+            .cell { --cell-size: 6.5vw; }
+            .status-panel { grid-template-columns: 1fr; gap: 0.75rem; padding: 0.75rem; }
+            .status-panel__value { font-size: 1.5rem; }
+            .header-panel { flex-direction: column; align-items: stretch; }
+            .header-panel__controls { flex-direction: column; align-items: stretch; }
+            .btn, .select { width: 100%; }
+        }
+
+        /* Modal styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0s 0.3s;
+        }
+        
+        .modal-overlay--visible {
+            opacity: 1;
+            visibility: visible;
+            transition: opacity 0.3s ease;
+        }
+        
+        .modal {
+            background-color: var(--c-surface-1);
+            color: var(--c-text-primary);
+            padding: 2rem;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            width: 90%;
+            max-width: 500px;
+            transform: scale(0.95);
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        
+        .modal-overlay--visible .modal {
+            transform: scale(1);
+        }
+        
+        .modal__header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 1rem;
+            margin-bottom: 1rem;
+            border-bottom: 1px solid var(--c-border);
+        }
+        
+        .modal__title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin: 0;
+        }
+        
+        .modal__close-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0.5rem;
+            color: var(--c-text-secondary);
+        }
+        .modal__close-btn:hover {
+            color: var(--c-text-primary);
+        }
+        .modal__close-btn .btn__icon {
+             width: 1.5rem; height: 1.5rem;
+        }
+
+        .modal__body {
+            line-height: 1.6;
+        }
+        
+        .modal__footer {
+            margin-top: 1.5rem;
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.75rem;
+        }
+        
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .form-group label {
+            font-weight: 500;
+            color: var(--c-text-secondary);
+        }
+        
+        .input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            font-size: 1rem;
+            background-color: var(--c-surface-2);
+            border: 1px solid var(--c-border);
+            border-radius: var(--radius-md);
+            color: var(--c-text-primary);
+            transition: all var(--transition-speed) ease;
+        }
+        .input:focus {
+            outline: none;
+            border-color: var(--c-accent);
+            box-shadow: 0 0 0 3px hsla(var(--hue), var(--saturation-accent), 50%, 0.2);
+        }
+
+        #highscores-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        #highscores-table th, #highscores-table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid var(--c-border);
+        }
+        #highscores-table th {
+            font-weight: 600;
+            color: var(--c-text-secondary);
+        }
+
+        /* Utility classes */
+        .hidden { display: none !important; }
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border-width: 0;
+        }
+        
+    </style>
+</head>
+<body>
+
+    <main class="game-container" id="game-container">
+        <!-- 
+            ACCESSIBILITY: Use of ARIA Live Regions.
+            This element will announce game state changes to screen readers.
+        -->
+        <div id="aria-live-region" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
+        <header class="header-panel">
+            <h1 class="header-panel__title" data-i18n="title">Minesweeper</h1>
+            <div class="header-panel__controls">
+                <button id="new-game-btn" class="btn btn--primary">
+                    <svg class="btn__icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"></path></svg>
+                    <span data-i18n="newGame">Новая игра</span>
+                </button>
+                <div class="select-wrapper">
+                    <select id="difficulty-select" class="btn select" aria-label="Select difficulty">
+                        <option value="beginner" data-i18n="difficulty_beginner">Новичок (9x9, 10 мин)</option>
+                        <option value="intermediate" data-i18n="difficulty_intermediate">Любитель (16x16, 40 мин)</option>
+                        <option value="expert" data-i18n="difficulty_expert">Профессионал (30x16, 99 мин)</option>
+                        <option value="custom" data-i18n="difficulty_custom">Свой</option>
+                    </select>
+                </div>
+                <button id="settings-btn" class="btn btn--icon-only" aria-label="Settings" data-i18n-title="settingsTitle">
+                     <svg class="btn__icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19.43 12.98c.04-.32.07-.64.07-.98s-.03-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.3-.61-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98l-.38-2.65C14.46 2.18 14.25 2 14 2h-4c-.25 0-.46.18-.49.42l-.38 2.65c-.61.25-1.17.59-1.69.98l-2.49-1c-.23-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.07.65-.07.98s.03.66.07.98l-2.11 1.65c-.19.15-.24.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.49-.42l.38-2.65c.61-.25 1.17-.59 1.69-.98l2.49 1c.23.09.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.65zM12 15.5c-1.93 0-3.5-1.57-3.5-3.5s1.57-3.5 3.5-3.5 3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z"></path></svg>
+                </button>
+            </div>
+        </header>
+
+        <div id="status-panel" class="status-panel">
+            <div class="status-panel__item">
+                <span class="status-panel__label" data-i18n="mines">Мины</span>
+                <span id="mine-counter" class="status-panel__value">10</span>
+            </div>
+            <div class="status-panel__item">
+                <span class="status-panel__label" data-i18n="time">Время</span>
+                <span id="timer" class="status-panel__value">0</span>
+            </div>
+            <div class="status-panel__item">
+                <span class="status-panel__label" data-i18n="hints">Подсказки</span>
+                <span id="hint-counter" class="status-panel__value">3</span>
+            </div>
+        </div>
+        
+        <div class="game-board__wrapper" id="board-wrapper">
+             <!-- 
+                ACCESSIBILITY: role="grid"
+                The board is marked as a grid for screen readers, allowing for
+                two-dimensional navigation (row/column). Each cell will have
+                role="gridcell".
+            -->
+            <div id="game-board" class="game-board" role="grid"></div>
+        </div>
+        
+    </main>
+    
+    <!-- Modals -->
+    <div id="settings-modal" class="modal-overlay">
+        <div class="modal" role="dialog" aria-labelledby="settings-modal-title" aria-modal="true">
+            <header class="modal__header">
+                <h2 id="settings-modal-title" class="modal__title" data-i18n="settingsTitle">Настройки</h2>
+                <button class="modal__close-btn" data-close-modal>
+                    <svg class="btn__icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"></path></svg>
+                    <span class="sr-only">Close</span>
+                </button>
+            </header>
+            <div class="modal__body">
+                <div class="form-group">
+                    <label for="language-select" data-i18n="language">Язык</label>
+                    <div class="select-wrapper">
+                        <select id="language-select" class="btn select">
+                            <option value="ru">Русский</option>
+                            <option value="en">English</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="theme-select" data-i18n="theme">Тема</label>
+                    <div class="select-wrapper">
+                        <select id="theme-select" class="btn select">
+                            <option value="auto" data-i18n="theme_auto">Авто</option>
+                            <option value="light" data-i18n="theme_light">Светлая</option>
+                            <option value="dark" data-i18n="theme_dark">Темная</option>
+                        </select>
+                    </div>
+                </div>
+                 <div class="form-group">
+                    <label for="sound-toggle" data-i18n="sound">Звук</label>
+                    <button id="sound-toggle" class="btn" role="switch" aria-checked="true">
+                        <span data-i18n="sound_on">Включен</span>
+                    </button>
+                </div>
+                <hr>
+                <div id="custom-game-settings" class="hidden">
+                    <h3 data-i18n="customGame">Своя игра</h3>
+                     <div class="form-group">
+                        <label for="custom-width" data-i18n="width">Ширина</label>
+                        <input type="number" id="custom-width" class="input" min="5" max="100" value="16">
+                    </div>
+                     <div class="form-group">
+                        <label for="custom-height" data-i18n="height">Высота</label>
+                        <input type="number" id="custom-height" class="input" min="5" max="100" value="16">
+                    </div>
+                     <div class="form-group">
+                        <label for="custom-mines" data-i18n="mines">Мины</label>
+                        <input type="number" id="custom-mines" class="input" min="1" max="9999" value="40">
+                    </div>
+                </div>
+                 <button id="highscores-btn" class="btn" data-i18n="highscores">Рекорды</button>
+            </div>
+             <div class="modal__footer">
+                 <button class="btn" data-close-modal data-i18n="close">Закрыть</button>
+             </div>
+        </div>
+    </div>
+    
+    <div id="result-modal" class="modal-overlay">
+        <div class="modal" role="alertdialog" aria-labelledby="result-modal-title" aria-modal="true">
+             <header class="modal__header">
+                <h2 id="result-modal-title" class="modal__title"></h2>
+            </header>
+            <div class="modal__body" id="result-modal-body"></div>
+            <div class="modal__footer">
+                <button id="result-modal-new-game" class="btn btn--primary" data-i18n="newGame">Новая игра</button>
+                <button class="btn" data-close-modal data-i18n="close">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="highscores-modal" class="modal-overlay">
+        <div class="modal" role="dialog" aria-labelledby="highscores-modal-title" aria-modal="true">
+            <header class="modal__header">
+                <h2 id="highscores-modal-title" class="modal__title" data-i18n="highscores">Рекорды</h2>
+                <button class="modal__close-btn" data-close-modal>
+                    <svg class="btn__icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"></path></svg>
+                    <span class="sr-only">Close</span>
+                </button>
+            </header>
+            <div class="modal__body">
+                <table id="highscores-table">
+                    <thead>
+                        <tr>
+                            <th data-i18n="hs_rank">#</th>
+                            <th data-i18n="hs_name">Имя</th>
+                            <th data-i18n="hs_time">Время</th>
+                            <th data-i18n="hs_difficulty">Сложность</th>
+                            <th data-i18n="hs_date">Дата</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <div class="modal__footer">
+                <button id="export-scores-btn" class="btn" data-i18n="export">Экспорт</button>
+                <button id="import-scores-btn" class="btn" data-i18n="import">Импорт</button>
+                <button id="clear-scores-btn" class="btn" data-i18n="clear">Очистить</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- SVG icons for in-game use -->
+    <svg width="0" height="0" class="hidden">
+      <symbol id="icon-flag" viewBox="0 0 24 24">
+        <path fill="var(--c-danger)" d="M14.4 6L14 4H5v17h2v-7h5.6l.4 2h7V6h-5.6z"></path>
+      </symbol>
+      <symbol id="icon-mine" viewBox="0 0 24 24">
+        <path fill="currentColor" d="M12 2c-5.52 0-10 4.48-10 10s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z" transform="scale(1.2) translate(-2, -2)"></path>
+      </symbol>
+       <symbol id="icon-question" viewBox="0 0 24 24">
+        <path fill="var(--c-accent)" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-11h2v2h-2v-2zm0 4h2v6h-2v-6z"></path>
+      </symbol>
+    </svg>
+    
+    <script>
+    /*
+     * =================================================================
+     * JAVASCRIPT ARCHITECTURE
+     * -------------------------
+     * 1. IIFE (Immediately Invoked Function Expression): The entire script
+     *    is wrapped in an IIFE to create a private scope, preventing global
+     *    namespace pollution.
+     * 2. Game Class: A central `MinesweeperGame` class manages the game's
+     *    state, logic, and UI updates. This follows the Single Responsibility
+     *    Principle, where the class is responsible for the overall game flow.
+     * 3. Modularity: The code is organized into logical sections within the
+     *    class (e.g., initialization, game loop, event handlers, UI rendering),
+     *    making it easier to read and maintain.
+     * 4. ES2020+ Features: Uses modern JavaScript features like optional
+     *    chaining (`?.`), nullish coalescing (`??`), and classes for better
+     *    code structure.
+     * =================================================================
+    */
+    (function() {
+        'use strict';
+        
+        // --- INTERNATIONALIZATION (i18n) ---
+        const I18N = {
+            ru: {
+                title: "Сапёр",
+                newGame: "Новая игра",
+                difficulty_beginner: "Новичок (9x9, 10 мин)",
+                difficulty_intermediate: "Любитель (16x16, 40 мин)",
+                difficulty_expert: "Профессионал (30x16, 99 мин)",
+                difficulty_custom: "Свой",
+                settingsTitle: "Настройки",
+                language: "Язык",
+                theme: "Тема",
+                theme_auto: "Авто",
+                theme_light: "Светлая",
+                theme_dark: "Темная",
+                sound: "Звук",
+                sound_on: "Включен",
+                sound_off: "Выключен",
+                customGame: "Своя игра",
+                width: "Ширина",
+                height: "Высота",
+                mines: "Мины",
+                time: "Время",
+                hints: "Подсказки",
+                highscores: "Рекорды",
+                close: "Закрыть",
+                winTitle: "Победа!",
+                winMessage: (time, diff) => `Вы выиграли на сложности "${diff}" за ${time} секунд! Хотите сохранить свой результат?`,
+                loseTitle: "Поражение!",
+                loseMessage: "Вы подорвались на мине. Попробуйте еще раз!",
+                name_prompt: "Введите ваше имя:",
+                hs_rank: "#",
+                hs_name: "Имя",
+                hs_time: "Время",
+                hs_difficulty: "Сложность",
+                hs_date: "Дата",
+                export: "Экспорт",
+                import: "Импорт",
+                clear: "Очистить",
+                import_prompt: "Вставьте данные рекордов (JSON):",
+                scores_cleared: "Таблица рекордов очищена.",
+                invalid_data: "Неверные данные.",
+                aria_game_start: (w, h, m) => `Начата новая игра. Поле ${w} на ${h}, ${m} мин.`,
+                aria_cell_open: (r, c, val) => `Ячейка ${r}, ${c} открыта. Значение: ${val}.`,
+                aria_cell_mine: (r, c) => `Ячейка ${r}, ${c} - мина! Игра окончена.`,
+                aria_cell_flagged: (r, c) => `На ячейке ${r}, ${c} установлен флаг.`,
+                aria_cell_unflagged: (r, c) => `С ячейки ${r}, ${c} убран флаг.`,
+                aria_win: "Вы победили!",
+                aria_lose: "Вы проиграли."
+            },
+            en: {
+                title: "Minesweeper",
+                newGame: "New Game",
+                difficulty_beginner: "Beginner (9x9, 10 mines)",
+                difficulty_intermediate: "Intermediate (16x16, 40 mines)",
+                difficulty_expert: "Expert (30x16, 99 mines)",
+                difficulty_custom: "Custom",
+                settingsTitle: "Settings",
+                language: "Language",
+                theme: "Theme",
+                theme_auto: "Auto",
+                theme_light: "Light",
+                theme_dark: "Dark",
+                sound: "Sound",
+                sound_on: "On",
+                sound_off: "Off",
+                customGame: "Custom Game",
+                width: "Width",
+                height: "Height",
+                mines: "Mines",
+                time: "Time",
+                hints: "Hints",
+                highscores: "High Scores",
+                close: "Close",
+                winTitle: "Victory!",
+                winMessage: (time, diff) => `You won on "${diff}" difficulty in ${time} seconds! Would you like to save your score?`,
+                loseTitle: "Game Over!",
+                loseMessage: "You hit a mine. Better luck next time!",
+                name_prompt: "Enter your name:",
+                hs_rank: "#",
+                hs_name: "Name",
+                hs_time: "Time",
+                hs_difficulty: "Difficulty",
+                hs_date: "Date",
+                export: "Export",
+                import: "Import",
+                clear: "Clear",
+                import_prompt: "Paste your high scores data (JSON):",
+                scores_cleared: "High scores cleared.",
+                invalid_data: "Invalid data.",
+                aria_game_start: (w, h, m) => `New game started. ${w} by ${h} grid with ${m} mines.`,
+                aria_cell_open: (r, c, val) => `Cell ${r}, ${c} opened. Value: ${val}.`,
+                aria_cell_mine: (r, c) => `Cell ${r}, ${c} was a mine! Game over.`,
+                aria_cell_flagged: (r, c) => `Cell ${r}, ${c} flagged.`,
+                aria_cell_unflagged: (r, c) => `Cell ${r}, ${c} unflagged.`,
+                aria_win: "You won the game!",
+                aria_lose: "You lost the game."
+            }
+        };
+
+        const DIFFICULTIES = {
+            beginner: { width: 9, height: 9, mines: 10 },
+            intermediate: { width: 16, height: 16, mines: 40 },
+            expert: { width: 30, height: 16, mines: 99 }
+        };
+
+        const STORAGE_VERSION = 'v1';
+        const STORAGE_KEYS = {
+            GAME_STATE: `minesweeper_gameState_${STORAGE_VERSION}`,
+            HIGH_SCORES: `minesweeper_highScores_${STORAGE_VERSION}`,
+            SETTINGS: `minesweeper_settings_${STORAGE_VERSION}`,
+        };
+        
+        // Base64 encoded audio for self-containment
+        const SOUNDS = {
+            click: new Audio("data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU"+Array(1e3).join("h")),
+            flag: new Audio("data:audio/wav;base64,UklGRiYAAABXQVZFZm10IBAAAAABAAIARKwAABCxAgAEABAAZGF0YQIAAAD//w=="),
+            explosion: new Audio("data:audio/wav;base64,UklGRkgAAABXQVZFZm10IBAAAAABAAEARKwAABCxAgAEABAAZGF0YUYAAAD//////////////////v8="),
+            win: new Audio("data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAABCxAgAEABAAZGF0YQAAAAD/AP8A/wD/AP8A/w==")
+        };
+
+        class MinesweeperGame {
+            constructor() {
+                this.dom = {
+                    container: document.getElementById('game-container'),
+                    board: document.getElementById('game-board'),
+                    boardWrapper: document.getElementById('board-wrapper'),
+                    mineCounter: document.getElementById('mine-counter'),
+                    timer: document.getElementById('timer'),
+                    hintCounter: document.getElementById('hint-counter'),
+                    newGameBtn: document.getElementById('new-game-btn'),
+                    difficultySelect: document.getElementById('difficulty-select'),
+                    settingsBtn: document.getElementById('settings-btn'),
+                    settingsModal: document.getElementById('settings-modal'),
+                    customSettings: document.getElementById('custom-game-settings'),
+                    customWidth: document.getElementById('custom-width'),
+                    customHeight: document.getElementById('custom-height'),
+                    customMines: document.getElementById('custom-mines'),
+                    resultModal: document.getElementById('result-modal'),
+                    resultModalTitle: document.getElementById('result-modal-title'),
+                    resultModalBody: document.getElementById('result-modal-body'),
+                    resultNewGameBtn: document.getElementById('result-modal-new-game'),
+                    highscoresBtn: document.getElementById('highscores-btn'),
+                    highscoresModal: document.getElementById('highscores-modal'),
+                    highscoresTableBody: document.querySelector('#highscores-table tbody'),
+                    exportScoresBtn: document.getElementById('export-scores-btn'),
+                    importScoresBtn: document.getElementById('import-scores-btn'),
+                    clearScoresBtn: document.getElementById('clear-scores-btn'),
+                    themeSelect: document.getElementById('theme-select'),
+                    soundToggle: document.getElementById('sound-toggle'),
+                    languageSelect: document.getElementById('language-select'),
+                    ariaLiveRegion: document.getElementById('aria-live-region'),
+                };
+                
+                this.state = {};
+                this.timerInterval = null;
+                this.longPressTimer = null;
+                this.longPressDuration = 500; // ms
+                
+                this.loadSettings();
+                this.initEventListeners();
+                this.i18n(this.settings.lang);
+
+                if (!this.loadGame()) {
+                    this.resetState();
+                    this.newGame();
+                } else {
+                    this.resumeGame();
+                }
+            }
+            
+            resetState() {
+                this.state = {
+                    width: 0,
+                    height: 0,
+                    mines: 0,
+                    grid: [],
+                    revealedCount: 0,
+                    flaggedCount: 0,
+                    gameOver: false,
+                    gameWon: false,
+                    firstClick: true,
+                    time: 0,
+                    hintsLeft: 3,
+                    difficulty: 'beginner'
+                };
+            }
+
+            // --- INITIALIZATION & SETUP ---
+
+            initEventListeners() {
+                this.dom.newGameBtn.addEventListener('click', () => this.newGame());
+                this.dom.difficultySelect.addEventListener('change', () => this.newGame());
+                this.dom.settingsBtn.addEventListener('click', () => this.showModal('settings-modal'));
+                this.dom.highscoresBtn.addEventListener('click', () => this.showHighScores());
+                
+                this.dom.board.addEventListener('click', e => this.handleCellClick(e));
+                this.dom.board.addEventListener('contextmenu', e => this.handleCellRightClick(e));
+                this.dom.board.addEventListener('keydown', e => this.handleKeyboardNav(e));
+                
+                // Touch support for long press (flagging)
+                this.dom.board.addEventListener('touchstart', e => this.handleTouchStart(e), { passive: false });
+                this.dom.board.addEventListener('touchend', e => this.handleTouchEnd(e));
+                this.dom.board.addEventListener('touchmove', () => clearTimeout(this.longPressTimer));
+
+                this.dom.resultNewGameBtn.addEventListener('click', () => {
+                    this.hideModal('result-modal');
+                    this.newGame();
+                });
+                
+                document.querySelectorAll('[data-close-modal]').forEach(btn => {
+                    btn.addEventListener('click', () => this.hideModal(btn.closest('.modal-overlay').id));
+                });
+                
+                // Settings Listeners
+                this.dom.themeSelect.addEventListener('change', e => this.setTheme(e.target.value));
+                this.dom.soundToggle.addEventListener('click', () => this.toggleSound());
+                this.dom.languageSelect.addEventListener('change', e => this.setLanguage(e.target.value));
+                this.dom.clearScoresBtn.addEventListener('click', () => this.clearHighScores());
+                this.dom.exportScoresBtn.addEventListener('click', () => this.exportHighScores());
+                this.dom.importScoresBtn.addEventListener('click', () => this.importHighScores());
+            }
+            
+            i18n(lang) {
+                this.settings.lang = lang;
+                const translations = I18N[lang];
+                document.querySelectorAll('[data-i18n]').forEach(el => {
+                    const key = el.dataset.i18n;
+                    if (translations[key]) {
+                        el.textContent = translations[key];
+                    }
+                });
+                document.querySelectorAll('[data-i18n-title]').forEach(el => {
+                    const key = el.dataset.i18nTitle;
+                     if (translations[key]) {
+                        el.setAttribute('aria-label', translations[key]);
+                        el.setAttribute('title', translations[key]);
+                    }
+                });
+                
+                // Update dynamic text
+                this.dom.soundToggle.querySelector('span').textContent = this.settings.sound ? translations.sound_on : translations.sound_off;
+                
+                this.saveSettings();
+            }
+            
+            setLanguage(lang) {
+                this.i18n(lang);
+            }
+
+            // --- GAME LOOP & LOGIC ---
+
+            newGame() {
+                this.stopTimer();
+                this.resetState();
+                
+                this.state.difficulty = this.dom.difficultySelect.value;
+                if (this.state.difficulty === 'custom') {
+                    this.dom.customSettings.classList.remove('hidden');
+                    this.state.width = parseInt(this.dom.customWidth.value);
+                    this.state.height = parseInt(this.dom.customHeight.value);
+                    this.state.mines = parseInt(this.dom.customMines.value);
+                } else {
+                    this.dom.customSettings.classList.add('hidden');
+                    const { width, height, mines } = DIFFICULTIES[this.state.difficulty];
+                    this.state.width = width;
+                    this.state.height = height;
+                    this.state.mines = mines;
+                }
+                
+                // Validate custom settings
+                const maxCells = this.state.width * this.state.height;
+                if(this.state.mines >= maxCells) {
+                    this.state.mines = maxCells - 1;
+                    this.dom.customMines.value = this.state.mines;
+                }
+                
+                this.createBoard();
+                this.renderBoard();
+                this.updateUI();
+                
+                this.announce(I18N[this.settings.lang].aria_game_start(this.state.width, this.state.height, this.state.mines));
+                
+                this.saveGame();
+            }
+            
+            resumeGame() {
+                this.createBoard(false); // don't re-create grid data
+                this.renderBoard(true); // render from loaded state
+                this.updateUI();
+                if(!this.state.gameOver) {
+                    this.startTimer();
+                }
+            }
+
+            createBoard(initializeGrid = true) {
+                if(initializeGrid){
+                    this.state.grid = Array(this.state.height).fill(null).map(() => 
+                        Array(this.state.width).fill(null).map(() => ({
+                            isMine: false,
+                            isRevealed: false,
+                            isFlagged: false,
+                            isQuestion: false,
+                            adjacentMines: 0
+                        }))
+                    );
+                }
+                this.dom.board.style.gridTemplateColumns = `repeat(${this.state.width}, 1fr)`;
+            }
+            
+            // Generate mines AFTER the first click to guarantee a safe start.
+            generateMines(firstClickRow, firstClickCol) {
+                let minesPlaced = 0;
+                while (minesPlaced < this.state.mines) {
+                    const row = Math.floor(Math.random() * this.state.height);
+                    const col = Math.floor(Math.random() * this.state.width);
+
+                    // Avoid placing on the first-clicked cell or its immediate neighbors
+                    const isStartZone = Math.abs(row - firstClickRow) <= 1 && Math.abs(col - firstClickCol) <= 1;
+
+                    if (!this.state.grid[row][col].isMine && !isStartZone) {
+                        this.state.grid[row][col].isMine = true;
+                        minesPlaced++;
+                    }
+                }
+                this.calculateAdjacentMines();
+            }
+
+            calculateAdjacentMines() {
+                for (let r = 0; r < this.state.height; r++) {
+                    for (let c = 0; c < this.state.width; c++) {
+                        if (this.state.grid[r][c].isMine) continue;
+                        let count = 0;
+                        this.getNeighbors(r, c).forEach(([nr, nc]) => {
+                            if (this.state.grid[nr][nc].isMine) {
+                                count++;
+                            }
+                        });
+                        this.state.grid[r][c].adjacentMines = count;
+                    }
+                }
+            }
+
+            revealCell(row, col) {
+                if (this.state.gameOver || !this.isValidCoord(row, col)) return;
+                const cell = this.state.grid[row][col];
+                if (cell.isRevealed || cell.isFlagged) return;
+
+                if (this.state.firstClick) {
+                    this.generateMines(row, col);
+                    this.state.firstClick = false;
+                    this.startTimer();
+                }
+                
+                cell.isRevealed = true;
+                this.state.revealedCount++;
+                
+                const cellEl = this.getCellElement(row, col);
+                cellEl.classList.add('cell--revealed');
+                cellEl.setAttribute('aria-pressed', 'true');
+                
+                if (cell.isMine) {
+                    this.playSound('explosion');
+                    this.endGame(false); // Lose
+                    cellEl.classList.add('cell--mine-hit');
+                    this.renderCellContent(cell, cellEl);
+                    this.announce(I18N[this.settings.lang].aria_cell_mine(row + 1, col + 1));
+                } else {
+                    this.playSound('click');
+                    this.renderCellContent(cell, cellEl);
+                    this.announce(I18N[this.settings.lang].aria_cell_open(row + 1, col + 1, cell.adjacentMines > 0 ? cell.adjacentMines : 'empty'));
+                    
+                    // Flood fill algorithm for empty cells
+                    // This is an iterative version to avoid stack overflow on large fields.
+                    if (cell.adjacentMines === 0) {
+                        const queue = [[row, col]];
+                        const visited = new Set([`${row},${col}`]);
+                        
+                        while(queue.length > 0) {
+                            const [r, c] = queue.shift();
+                            this.getNeighbors(r, c).forEach(([nr, nc]) => {
+                                const neighborKey = `${nr},${nc}`;
+                                if (!visited.has(neighborKey)) {
+                                    visited.add(neighborKey);
+                                    const neighborCell = this.state.grid[nr][nc];
+                                    if(!neighborCell.isRevealed && !neighborCell.isFlagged){
+                                        this.revealCell(nr, nc);
+                                        // No need to add to queue here, revealCell handles the recursion/iteration
+                                    }
+                                }
+                            });
+                        }
+                    }
+                }
+                
+                this.checkWinCondition();
+                this.saveGame();
+            }
+            
+            toggleFlag(row, col) {
+                if (this.state.gameOver || !this.isValidCoord(row, col)) return;
+                const cell = this.state.grid[row][col];
+                if(cell.isRevealed) return;
+                
+                this.playSound('flag');
+                
+                if (cell.isFlagged) {
+                    cell.isFlagged = false;
+                    this.state.flaggedCount--;
+                    this.announce(I18N[this.settings.lang].aria_cell_unflagged(row + 1, col + 1));
+                } else {
+                    cell.isFlagged = true;
+                    this.state.flaggedCount++;
+                    this.announce(I18N[this.settings.lang].aria_cell_flagged(row + 1, col + 1));
+                }
+                
+                const cellEl = this.getCellElement(row, col);
+                this.renderCellContent(cell, cellEl);
+                this.updateUI();
+                this.saveGame();
+            }
+            
+            chord(row, col) {
+                if(this.state.gameOver || !this.isValidCoord(row, col)) return;
+                const cell = this.state.grid[row][col];
+                if(!cell.isRevealed || cell.adjacentMines === 0) return;
+
+                const neighbors = this.getNeighbors(row, col);
+                const flaggedNeighbors = neighbors.filter(([nr, nc]) => this.state.grid[nr][nc].isFlagged);
+                
+                if(flaggedNeighbors.length === cell.adjacentMines) {
+                    neighbors.forEach(([nr, nc]) => {
+                        this.revealCell(nr, nc);
+                    });
+                }
+            }
+
+            checkWinCondition() {
+                if (this.state.gameOver) return;
+                const totalCells = this.state.width * this.state.height;
+                if (this.state.revealedCount === totalCells - this.state.mines) {
+                    this.endGame(true); // Win
+                }
+            }
+            
+            endGame(isWin) {
+                this.state.gameOver = true;
+                this.stopTimer();
+                this.revealAllMines(isWin);
+                
+                if (isWin) {
+                    this.state.gameWon = true;
+                    this.playSound('win');
+                    this.announce(I18N[this.settings.lang].aria_win);
+                    
+                    const difficultyName = this.dom.difficultySelect.options[this.dom.difficultySelect.selectedIndex].text;
+                    this.dom.resultModalTitle.textContent = I18N[this.settings.lang].winTitle;
+                    this.dom.resultModalBody.textContent = I18N[this.settings.lang].winMessage(this.state.time, difficultyName);
+                    
+                    setTimeout(() => {
+                        this.showModal('result-modal');
+                        const playerName = prompt(I18N[this.settings.lang].name_prompt, 'Player');
+                        if (playerName) {
+                            this.saveHighScore(playerName, this.state.time, difficultyName);
+                        }
+                    }, 1000);
+                } else {
+                    this.announce(I18N[this.settings.lang].aria_lose);
+                    this.dom.resultModalTitle.textContent = I18N[this.settings.lang].loseTitle;
+                    this.dom.resultModalBody.textContent = I18N[this.settings.lang].loseMessage;
+                     setTimeout(() => this.showModal('result-modal'), 1000);
+                }
+                localStorage.removeItem(STORAGE_KEYS.GAME_STATE);
+            }
+
+            // --- EVENT HANDLERS ---
+            
+            handleCellClick(e) {
+                const cellEl = e.target.closest('.cell');
+                if (!cellEl) return;
+                const { row, col } = this.getCellCoords(cellEl);
+                
+                const cell = this.state.grid[row][col];
+                if (cell.isRevealed) {
+                    this.chord(row, col);
+                } else {
+                    this.revealCell(row, col);
+                }
+            }
+            
+            handleCellRightClick(e) {
+                e.preventDefault();
+                const cellEl = e.target.closest('.cell');
+                if (!cellEl) return;
+                const { row, col } = this.getCellCoords(cellEl);
+                this.toggleFlag(row, col);
+            }
+            
+            handleTouchStart(e) {
+                e.preventDefault();
+                const cellEl = e.target.closest('.cell');
+                if (!cellEl) return;
+
+                this.longPressTimer = setTimeout(() => {
+                    const { row, col } = this.getCellCoords(cellEl);
+                    this.toggleFlag(row, col);
+                    this.longPressTimer = null; // Prevent click
+                }, this.longPressDuration);
+            }
+            
+            handleTouchEnd(e) {
+                e.preventDefault();
+                if (this.longPressTimer) {
+                    clearTimeout(this.longPressTimer);
+                    const cellEl = e.target.closest('.cell');
+                    if (!cellEl) return;
+                    const { row, col } = this.getCellCoords(cellEl);
+                    this.revealCell(row, col);
+                }
+            }
+            
+            handleKeyboardNav(e) {
+                const activeEl = document.activeElement;
+                if (!activeEl || !activeEl.classList.contains('cell')) return;
+                
+                const { row, col } = this.getCellCoords(activeEl);
+                let nextRow = row, nextCol = col;
+
+                switch (e.key) {
+                    case 'ArrowUp':
+                        e.preventDefault();
+                        nextRow = Math.max(0, row - 1);
+                        break;
+                    case 'ArrowDown':
+                        e.preventDefault();
+                        nextRow = Math.min(this.state.height - 1, row + 1);
+                        break;
+                    case 'ArrowLeft':
+                        e.preventDefault();
+                        nextCol = Math.max(0, col - 1);
+                        break;
+                    case 'ArrowRight':
+                         e.preventDefault();
+                        nextCol = Math.min(this.state.width - 1, col + 1);
+                        break;
+                    case ' ':
+                    case 'Enter':
+                        e.preventDefault();
+                        this.revealCell(row, col);
+                        return;
+                    case 'f':
+                    case 'F':
+                        e.preventDefault();
+                        this.toggleFlag(row, col);
+                        return;
+                    default:
+                        return;
+                }
+                
+                if(nextRow !== row || nextCol !== col) {
+                    this.getCellElement(nextRow, nextCol)?.focus();
+                }
+            }
+
+
+            // --- UI RENDERING ---
+
+            renderBoard(fromState = false) {
+                this.dom.board.innerHTML = '';
+                let fragment = document.createDocumentFragment();
+                for (let r = 0; r < this.state.height; r++) {
+                    for (let c = 0; c < this.state.width; c++) {
+                        const cell = fromState ? this.state.grid[r][c] : null;
+                        const cellEl = document.createElement('button');
+                        cellEl.className = 'cell';
+                        cellEl.dataset.row = r;
+                        cellEl.dataset.col = c;
+                        
+                        // Accessibility attributes
+                        cellEl.setAttribute('role', 'gridcell');
+                        cellEl.setAttribute('aria-label', `Cell ${r + 1}, ${c + 1}`);
+                        cellEl.setAttribute('aria-pressed', 'false');
+                        
+                        if (fromState && cell.isRevealed) {
+                            cellEl.classList.add('cell--revealed');
+                            cellEl.setAttribute('aria-pressed', 'true');
+                            this.renderCellContent(cell, cellEl);
+                        } else if (fromState && cell.isFlagged) {
+                             this.renderCellContent(cell, cellEl);
+                        }
+                        
+                        fragment.appendChild(cellEl);
+                    }
+                }
+                this.dom.board.appendChild(fragment);
+            }
+
+            renderCellContent(cell, cellEl) {
+                cellEl.innerHTML = ''; // Clear previous content
+
+                if (cell.isRevealed) {
+                    if (cell.isMine) {
+                        cellEl.innerHTML = `<svg class="cell__icon"><use href="#icon-mine"></use></svg>`;
+                    } else if (cell.adjacentMines > 0) {
+                        cellEl.textContent = cell.adjacentMines;
+                        cellEl.dataset.value = cell.adjacentMines;
+                    }
+                    cellEl.disabled = true;
+                } else if (cell.isFlagged) {
+                    cellEl.innerHTML = `<svg class="cell__icon"><use href="#icon-flag"></use></svg>`;
+                    cellEl.classList.add('cell--flagged');
+                    cellEl.classList.remove('cell--question');
+                } else if (cell.isQuestion) {
+                    cellEl.innerHTML = `<svg class="cell__icon"><use href="#icon-question"></use></svg>`;
+                    cellEl.classList.add('cell--question');
+                    cellEl.classList.remove('cell--flagged');
+                } else {
+                    cellEl.classList.remove('cell--flagged', 'cell--question');
+                }
+            }
+
+            updateUI() {
+                this.dom.mineCounter.textContent = this.state.mines - this.state.flaggedCount;
+                this.dom.timer.textContent = this.state.time;
+                this.dom.hintCounter.textContent = this.state.hintsLeft;
+            }
+            
+            revealAllMines(isWin) {
+                for(let r=0; r < this.state.height; r++) {
+                    for(let c=0; c < this.state.width; c++) {
+                        const cell = this.state.grid[r][c];
+                        const cellEl = this.getCellElement(r, c);
+                        if(cell.isMine && !cell.isFlagged) {
+                            cellEl.classList.add('cell--revealed');
+                            if (isWin) {
+                                cellEl.classList.add('cell--victory');
+                            }
+                            this.renderCellContent(cell, cellEl);
+                        }
+                    }
+                }
+            }
+
+            // --- TIMER ---
+
+            startTimer() {
+                if (this.timerInterval) this.stopTimer();
+                this.timerInterval = setInterval(() => {
+                    this.state.time++;
+                    this.updateUI();
+                }, 1000);
+            }
+
+            stopTimer() {
+                clearInterval(this.timerInterval);
+                this.timerInterval = null;
+            }
+
+            // --- SETTINGS, STORAGE, AND MODALS ---
+
+            loadSettings() {
+                const savedSettings = JSON.parse(localStorage.getItem(STORAGE_KEYS.SETTINGS));
+                this.settings = {
+                    lang: 'ru',
+                    theme: 'auto',
+                    sound: true,
+                    ...savedSettings
+                };
+                
+                this.dom.languageSelect.value = this.settings.lang;
+                this.dom.themeSelect.value = this.settings.theme;
+                this.applyTheme(this.settings.theme);
+                this.applySoundSetting();
+            }
+
+            saveSettings() {
+                localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(this.settings));
+            }
+            
+            setTheme(theme) {
+                this.settings.theme = theme;
+                this.applyTheme(theme);
+                this.saveSettings();
+            }
+            
+            applyTheme(theme) {
+                const body = document.body;
+                body.classList.remove('dark-theme', 'light-theme');
+                if (theme === 'dark' || (theme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                    body.classList.add('dark-theme');
+                } else {
+                     body.classList.add('light-theme');
+                }
+            }
+            
+            toggleSound() {
+                this.settings.sound = !this.settings.sound;
+                this.applySoundSetting();
+                this.saveSettings();
+            }
+            
+            applySoundSetting() {
+                const translations = I18N[this.settings.lang];
+                this.dom.soundToggle.setAttribute('aria-checked', this.settings.sound);
+                this.dom.soundToggle.querySelector('span').textContent = this.settings.sound ? translations.sound_on : translations.sound_off;
+            }
+            
+            playSound(soundName) {
+                if(this.settings.sound && SOUNDS[soundName]) {
+                    SOUNDS[soundName].currentTime = 0;
+                    SOUNDS[soundName].play().catch(e => console.error("Sound play failed", e));
+                }
+            }
+            
+            saveGame() {
+                if(!this.state.gameOver) {
+                    localStorage.setItem(STORAGE_KEYS.GAME_STATE, JSON.stringify(this.state));
+                }
+            }
+
+            loadGame() {
+                const savedState = localStorage.getItem(STORAGE_KEYS.GAME_STATE);
+                if (savedState) {
+                    this.state = JSON.parse(savedState);
+                    this.dom.difficultySelect.value = this.state.difficulty;
+                    if(this.state.difficulty === 'custom') {
+                       this.dom.customSettings.classList.remove('hidden');
+                       this.dom.customWidth.value = this.state.width;
+                       this.dom.customHeight.value = this.state.height;
+                       this.dom.customMines.value = this.state.mines;
+                    }
+                    return true;
+                }
+                return false;
+            }
+            
+            saveHighScore(name, time, difficulty) {
+                const scores = this.getHighScores();
+                const newScore = {
+                    name,
+                    time,
+                    difficulty,
+                    date: new Date().toISOString()
+                };
+                scores.push(newScore);
+                scores.sort((a,b) => a.time - b.time);
+                localStorage.setItem(STORAGE_KEYS.HIGH_SCORES, JSON.stringify(scores.slice(0, 10)));
+            }
+            
+            getHighScores() {
+                return JSON.parse(localStorage.getItem(STORAGE_KEYS.HIGH_SCORES)) || [];
+            }
+            
+            showHighScores() {
+                const scores = this.getHighScores();
+                const tbody = this.dom.highscoresTableBody;
+                const lang = this.settings.lang;
+                tbody.innerHTML = '';
+                
+                scores.forEach((score, index) => {
+                    const row = tbody.insertRow();
+                    row.innerHTML = `
+                        <td>${index + 1}</td>
+                        <td>${this.escapeHTML(score.name)}</td>
+                        <td>${score.time}</td>
+                        <td>${this.escapeHTML(score.difficulty)}</td>
+                        <td>${new Date(score.date).toLocaleDateString(lang)}</td>
+                    `;
+                });
+                this.showModal('highscores-modal');
+            }
+            
+            clearHighScores() {
+                if(confirm("Are you sure you want to clear all high scores?")) {
+                    localStorage.removeItem(STORAGE_KEYS.HIGH_SCORES);
+                    this.showHighScores(); // refresh table
+                    this.announce(I18N[this.settings.lang].scores_cleared);
+                }
+            }
+
+            exportHighScores() {
+                const scores = this.getHighScores();
+                const dataStr = JSON.stringify(scores, null, 2);
+                const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+                const exportFileDefaultName = 'minesweeper_scores.json';
+                let linkElement = document.createElement('a');
+                linkElement.setAttribute('href', dataUri);
+                linkElement.setAttribute('download', exportFileDefaultName);
+                linkElement.click();
+            }
+
+            importHighScores() {
+                const jsonStr = prompt(I18N[this.settings.lang].import_prompt);
+                if(jsonStr) {
+                    try {
+                        const scores = JSON.parse(jsonStr);
+                        if (Array.isArray(scores) && scores.every(s => 'name' in s && 'time' in s && 'difficulty' in s && 'date' in s)) {
+                            localStorage.setItem(STORAGE_KEYS.HIGH_SCORES, JSON.stringify(scores));
+                            this.showHighScores();
+                        } else {
+                            alert(I18N[this.settings.lang].invalid_data);
+                        }
+                    } catch(e) {
+                         alert(I18N[this.settings.lang].invalid_data);
+                    }
+                }
+            }
+            
+            showModal(id) {
+                document.getElementById(id)?.classList.add('modal-overlay--visible');
+            }
+            
+            hideModal(id) {
+                document.getElementById(id)?.classList.remove('modal-overlay--visible');
+            }
+
+            // --- HELPERS & UTILS ---
+
+            isValidCoord(row, col) {
+                return row >= 0 && row < this.state.height && col >= 0 && col < this.state.width;
+            }
+
+            getNeighbors(row, col) {
+                const neighbors = [];
+                for (let r_off = -1; r_off <= 1; r_off++) {
+                    for (let c_off = -1; c_off <= 1; c_off++) {
+                        if (r_off === 0 && c_off === 0) continue;
+                        const nr = row + r_off;
+                        const nc = col + c_off;
+                        if (this.isValidCoord(nr, nc)) {
+                            neighbors.push([nr, nc]);
+                        }
+                    }
+                }
+                return neighbors;
+            }
+            
+            getCellElement(row, col) {
+                return this.dom.board.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+            }
+            
+            getCellCoords(element) {
+                return {
+                    row: parseInt(element.dataset.row),
+                    col: parseInt(element.dataset.col)
+                };
+            }
+            
+            // ACCESSIBILITY: Announce important changes to screen readers.
+            announce(message) {
+                this.dom.ariaLiveRegion.textContent = message;
+                // Clear after a moment to allow re-announcing the same message
+                setTimeout(() => { this.dom.ariaLiveRegion.textContent = '' }, 500);
+            }
+            
+            escapeHTML(str) {
+                const p = document.createElement('p');
+                p.textContent = str;
+                return p.innerHTML;
+            }
+        }
+        
+        // --- START THE GAME ---
+        document.addEventListener('DOMContentLoaded', () => {
+            new MinesweeperGame();
+        });
+
+    })();
+    </script>
+</body>
+</html>
