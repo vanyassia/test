@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini Virtual Drum Set</title>
+    <style>
+        :root {
+            --glow-color: #00ffff;
+        }
+
+        html {
+            font-size: 10px;
+            background: #1a1a1a url('https://www.transparenttextures.com/patterns/dark-denim-3.png');
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            font-family: 'Helvetica Neue', sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: white;
+        }
+
+        h1 {
+            font-size: 4rem;
+            color: #fff;
+            text-shadow: 0 0 10px var(--glow-color), 0 0 20px var(--glow-color), 0 0 30px #fff;
+            margin-bottom: 2rem;
+        }
+
+        .keys {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            gap: 1.5rem;
+        }
+
+        .key {
+            border: .4rem solid #333;
+            border-radius: .8rem;
+            width: 10rem;
+            height: 10rem;
+            text-align: center;
+            color: white;
+            background: rgba(0,0,0,0.4);
+            text-shadow: 0 0 .5rem black;
+            transition: all .07s ease;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        kbd {
+            display: block;
+            font-size: 4rem;
+        }
+
+        .sound {
+            font-size: 1.2rem;
+            text-transform: uppercase;
+            letter-spacing: .1rem;
+            color: var(--glow-color);
+        }
+
+        .playing {
+            transform: scale(1.1);
+            border-color: var(--glow-color);
+            box-shadow: 0 0 1rem var(--glow-color);
+        }
+
+        .controls {
+            margin-top: 4rem;
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+        }
+
+        .record-btn {
+            padding: 1rem 2rem;
+            font-size: 1.6rem;
+            font-weight: bold;
+            cursor: pointer;
+            border: 3px solid #555;
+            border-radius: 5px;
+            background: #333;
+            color: white;
+            transition: all 0.2s ease;
+        }
+
+        .record-btn:hover {
+            background: #444;
+            border-color: #777;
+        }
+
+        .record-btn.is-recording {
+            background: #c90000;
+            border-color: #ff4d4d;
+            color: white;
+            animation: pulse 1.2s infinite;
+        }
+
+        #recordedAudio {
+            border-radius: 5px;
+        }
+        
+        @keyframes pulse {
+          0% {
+            box-shadow: 0 0 0 0 rgba(255, 77, 77, 0.7);
+          }
+          70% {
+            box-shadow: 0 0 0 15px rgba(255, 77, 77, 0);
+          }
+          100% {
+            box-shadow: 0 0 0 0 rgba(255, 77, 77, 0);
+          }
+        }
+
+    </style>
+</head>
+<body>
+
+    <h1>Virtual Drum Set</h1>
+
+    <div class="keys">
+        <div data-key="65" class="key">
+            <kbd>A</kbd>
+            <span class="sound">Clap</span>
+        </div>
+        <div data-key="83" class="key">
+            <kbd>S</kbd>
+            <span class="sound">Hihat</span>
+        </div>
+        <div data-key="68" class="key">
+            <kbd>D</kbd>
+            <span class="sound">Kick</span>
+        </div>
+        <div data-key="70" class="key">
+            <kbd>F</kbd>
+            <span class="sound">Openhat</span>
+        </div>
+        <div data-key="71" class="key">
+            <kbd>G</kbd>
+            <span class="sound">Boom</span>
+        </div>
+        <div data-key="72" class="key">
+            <kbd>H</kbd>
+            <span class="sound">Ride</span>
+        </div>
+        <div data-key="74" class="key">
+            <kbd>J</kbd>
+            <span class="sound">Snare</span>
+        </div>
+        <div data-key="75" class="key">
+            <kbd>K</kbd>
+            <span class="sound">Tom</span>
+        </div>
+        <div data-key="76" class="key">
+            <kbd>L</kbd>
+            <span class="sound">Tink</span>
+        </div>
+    </div>
+    
+    <div class="controls">
+        <button class="record-btn" id="recordBtn">Record</button>
+        <audio id="recordedAudio" controls></audio>
+    </div>
+
+    <!-- 
+      !!! IMPORTANT !!!
+      Replace the 'src' attribute for each audio tag below with the path to your own sound files.
+      Example: <audio data-key="65" src="sounds/my-clap-sound.wav"></audio>
+    -->
+    <audio data-key="65" src="sounds/clap.wav"></audio>
+    <audio data-key="83" src="sounds/hihat.wav"></audio>
+    <audio data-key="68" src="sounds/kick.wav"></audio>
+    <audio data-key="70" src="sounds/openhat.wav"></audio>
+    <audio data-key="71" src="sounds/boom.wav"></audio>
+    <audio data-key="72" src="sounds/ride.wav"></audio>
+    <audio data-key="74" src="sounds/snare.wav"></audio>
+    <audio data-key="75" src="sounds/tom.wav"></audio>
+    <audio data-key="76" src="sounds/tink.wav"></audio>
+
+<script>
+    // --- PART 1: DRUM PLAYING ---
+    function playSound(e) {
+        // Use keyCode for keyboard events or get data-key from the element for clicks
+        const keyCode = e.keyCode || this.getAttribute('data-key');
+        const audio = document.querySelector(`audio[data-key="${keyCode}"]`);
+        const key = document.querySelector(`.key[data-key="${keyCode}"]`);
+
+        if (!audio) return; // Stop the function from running if there's no audio element
+
+        key.classList.add('playing');
+        audio.currentTime = 0; // Rewind to the start to allow rapid playing
+        audio.play();
+    }
+
+    function removeTransition(e) {
+        if (e.propertyName !== 'transform') return; // Skip if it's not a transform
+        this.classList.remove('playing');
+    }
+
+    const keys = document.querySelectorAll('.key');
+    keys.forEach(key => key.addEventListener('transitionend', removeTransition));
+    keys.forEach(key => key.addEventListener('click', playSound));
+    window.addEventListener('keydown', playSound);
+
+    // --- PART 2: RECORDING ---
+    const recordBtn = document.getElementById('recordBtn');
+    const recordedAudio = document.getElementById('recordedAudio');
+    let mediaRecorder;
+    let recordedChunks = [];
+    let isRecording = false;
+
+    recordBtn.addEventListener('click', () => {
+        if (!isRecording) {
+            startRecording();
+        } else {
+            stopRecording();
+        }
+    });
+
+    function startRecording() {
+        // We will capture the audio output using the Web Audio API for a cleaner recording
+        // without needing microphone permissions.
+        
+        // 1. Create a single AudioContext
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        // 2. Create a destination node
+        const destination = audioCtx.createMediaStreamDestination();
+        
+        // 3. Connect all audio elements to this destination
+        const audioElements = document.querySelectorAll('audio[data-key]');
+        audioElements.forEach(audioEl => {
+            const source = audioCtx.createMediaElementSource(audioEl);
+            source.connect(destination);
+            source.connect(audioCtx.destination); // Also connect to speakers so we can hear it
+        });
+        
+        // 4. Start the MediaRecorder
+        mediaRecorder = new MediaRecorder(destination.stream);
+        
+        mediaRecorder.ondataavailable = e => {
+            if (e.data.size > 0) {
+                recordedChunks.push(e.data);
+            }
+        };
+
+        mediaRecorder.onstop = () => {
+            const blob = new Blob(recordedChunks, { type: 'audio/webm' });
+            recordedChunks = []; // Clear the chunks
+            const audioURL = URL.createObjectURL(blob);
+            recordedAudio.src = audioURL;
+        };
+
+        mediaRecorder.start();
+        isRecording = true;
+        recordBtn.textContent = 'Stop';
+        recordBtn.classList.add('is-recording');
+        recordedAudio.style.display = 'none'; // Hide the player while recording
+    }
+
+    function stopRecording() {
+        mediaRecorder.stop();
+        isRecording = false;
+        recordBtn.textContent = 'Record';
+        recordBtn.classList.remove('is-recording');
+        recordedAudio.style.display = 'block'; // Show the player
+    }
+
+</script>
+</body>
+</html>
