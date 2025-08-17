@@ -1,0 +1,551 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Image ⇄ Binary/Hex/Base85 — Encoder & Decoder</title>
+<style>
+  :root{--bg:#0f1720;--card:#0b1220;--accent:#60a5fa;--muted:#9ca3af;--glass: rgba(255,255,255,0.03)}
+  *{box-sizing:border-box;font-family:Inter,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial}
+  body{margin:0;background:linear-gradient(180deg,#071023 0%, #081424 100%);color:#e6eef8;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:28px}
+  .wrap{width:100%;max-width:1100px}
+  header{display:flex;gap:16px;align-items:center;margin-bottom:18px}
+  h1{font-size:18px;margin:0}
+  p.lead{margin:0;color:var(--muted);font-size:13px}
+  .grid{display:grid;grid-template-columns:1fr 420px;gap:18px}
+  .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));padding:18px;border-radius:12px;border:1px solid rgba(255,255,255,0.03)}
+  .uploader{border:2px dashed var(--glass);padding:18px;border-radius:10px;text-align:center;cursor:pointer;transition:all .15s}
+  .uploader.drag{background:rgba(96,165,250,0.04);border-color:rgba(96,165,250,0.18)}
+  input[type=file]{display:none}
+  .controls{display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap}
+  .btn{background:transparent;border:1px solid rgba(255,255,255,0.06);padding:8px 12px;border-radius:8px;color:inherit;cursor:pointer}
+  .btn.primary{background:var(--accent);color:#061022;border:none}
+  .radio{display:flex;gap:8px;align-items:center}
+  textarea{width:100%;min-height:220px;background:transparent;border:1px solid rgba(255,255,255,0.04);padding:12px;border-radius:8px;color:inherit;font-family:ui-monospace,monospace;font-size:12px;resize:vertical}
+  .meta{display:flex;justify-content:space-between;color:var(--muted);font-size:13px;margin-top:8px}
+  .progress{width:100%;height:10px;background:rgba(255,255,255,0.04);border-radius:999px;overflow:hidden;margin-top:10px}
+  .bar{height:100%;width:0;background:linear-gradient(90deg, #4f46e5, #60a5fa);transition:width .15s}
+  .small{font-size:12px;color:var(--muted)}
+  .img-preview{max-width:100%;border-radius:8px;display:block;margin-top:12px}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .note{font-size:12px;color:#fca5a5}
+  footer{margin-top:12px;color:var(--muted);font-size:12px}
+  @media (max-width:980px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Image ⇄ Binary / Hex / Base85 — Encoder & Decoder</h1>
+      <p class="lead">Прототип: загрузи картинку → получи binary/hex/base85 код → вставь код обратно → восстанови изображение.</p>
+    </div>
+  </header>
+
+  <div class="grid">
+    <!-- LEFT: main controls -->
+    <div class="card">
+      <div id="drop" class="uploader">
+        <strong id="uploader-title">Перетащи или выбери изображение</strong>
+        <div class="small" id="uploader-sub">PNG / JPEG / GIF — файл не должен быть слишком большим (рекомендовано ≤ 50 МБ)</div>
+        <input id="fileInput" type="file" accept="image/*" />
+      </div>
+
+      <div class="controls" style="margin-top:12px">
+        <div class="radio">
+          <label><input type="radio" name="mode" value="binary" > Binary</label>
+          <label style="margin-left:8px"><input type="radio" name="mode" value="hex" checked> Hex</label>
+          <label style="margin-left:8px"><input type="radio" name="mode" value="base85"> Base85</label>
+        </div>
+
+        <label class="small" style="margin-left:auto">Показ: 
+          <select id="displayStyle" style="margin-left:6px;padding:6px;border-radius:6px;background:transparent;border:1px solid rgba(255,255,255,0.04);color:inherit">
+            <option value="continuous">continuous</option>
+            <option value="grouped">grouped (байты / блоки)</option>
+            <option value="grouped-spaced">grouped (с пробелами)</option>
+          </select>
+        </label>
+      </div>
+
+      <div style="margin-top:12px" class="row">
+        <button id="encodeBtn" class="btn primary">Кодировать →</button>
+        <a id="downloadCodeBtn" class="btn" disabled>Скачать код (.txt)</a>
+        <button id="copyCodeBtn" class="btn" disabled>Копировать</button>
+        <button id="clearCodeBtn" class="btn">Очистить</button>
+        <div style="margin-left:auto" class="small" id="fileInfo">Нет файла</div>
+      </div>
+
+      <div class="progress" aria-hidden="true" style="margin-top:10px"><div id="progressBar" class="bar"></div></div>
+
+      <div style="margin-top:12px">
+        <textarea id="codeArea" placeholder="Здесь будет вывод бинарного/hex/base85 кода — либо вставь код для декодирования..." spellcheck="false"></textarea>
+        <div class="meta">
+          <div class="small" id="codeMeta">0 байт → 0 символов</div>
+          <div class="small"><button id="loadTxtBtn" class="btn">Загрузить .txt для декодирования</button></div>
+        </div>
+
+        <div style="margin-top:8px" class="row">
+          <button id="decodeBtn" class="btn primary">Декодировать ←</button>
+          <a id="downloadDecodedBtn" class="btn" disabled>Скачать восстановленное</a>
+          <div id="decodedName" class="small" style="margin-left:8px;color:var(--muted)">—</div>
+        </div>
+
+        <img id="previewImg" class="img-preview" style="display:none" alt="Preview"/>
+        <div id="messages" class="note" style="display:none"></div>
+      </div>
+
+      <footer>
+        Base85 (Ascii85) даёт ~1.25 символа/байт — компактнее hex. Hex — прост и универсален. Binary — для наглядности.
+      </footer>
+    </div>
+
+    <!-- RIGHT: info / options -->
+    <div class="card">
+      <h3 style="margin-top:0;margin-bottom:8px">Подробности & параметры</h3>
+      <div class="small">
+        <ul>
+          <li><strong>Binary</strong> — 8 символов на байт: <code>01010101</code></li>
+          <li><strong>Hex</strong> — 2 символа на байт: <code>FF</code></li>
+          <li><strong>Base85 (Ascii85)</strong> — 4 байта → 5 символов; поддерживается сокращение <code>z</code> для блока из 4 нулевых байт</li>
+          <li>Display grouped: разбивает вывод для удобства чтения (для base85 — группировка по 5-символьным блокам)</li>
+          <li>Кодирование выполняется чанками по 1 МБ, прогресс отображается</li>
+        </ul>
+      </div>
+
+      <hr style="border:none;border-top:1px solid rgba(255,255,255,0.03);margin:12px 0"/>
+
+      <h4 style="margin:6px 0">Сценарии использования</h4>
+      <div class="small" style="line-height:1.4">
+        • демонстрация низкоуровневого представления файлов; <br>
+        • обмен/хранение бинарных данных в текстовом виде; <br>
+        • образовательные задачки.
+      </div>
+
+      <hr style="border:none;border-top:1px solid rgba(255,255,255,0.03);margin:12px 0"/>
+
+      <div style="display:flex;gap:8px;flex-direction:column">
+        <button id="exampleSmallBtn" class="btn">Протестировать на маленьком примере</button>
+        <button id="clearAllBtn" class="btn">Полностью очистить</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+/*
+  Image ⇄ Binary/Hex/Base85 — single-file prototype (updated with Base85)
+  - chunked file reading (1 MB)
+  - Ascii85 (Base85) encode/decode with 'z' support
+  - incremental UI updates
+*/
+
+const fileInput = document.getElementById('fileInput');
+const drop = document.getElementById('drop');
+const encodeBtn = document.getElementById('encodeBtn');
+const decodeBtn = document.getElementById('decodeBtn');
+const codeArea = document.getElementById('codeArea');
+const progressBar = document.getElementById('progressBar');
+const fileInfo = document.getElementById('fileInfo');
+const codeMeta = document.getElementById('codeMeta');
+const downloadCodeBtn = document.getElementById('downloadCodeBtn');
+const copyCodeBtn = document.getElementById('copyCodeBtn');
+const clearCodeBtn = document.getElementById('clearCodeBtn');
+const displayStyle = document.getElementById('displayStyle');
+const loadTxtBtn = document.getElementById('loadTxtBtn');
+const downloadDecodedBtn = document.getElementById('downloadDecodedBtn');
+const previewImg = document.getElementById('previewImg');
+const decodedName = document.getElementById('decodedName');
+const messages = document.getElementById('messages');
+const exampleSmallBtn = document.getElementById('exampleSmallBtn');
+const clearAllBtn = document.getElementById('clearAllBtn');
+
+let currentFile = null;
+let lastEncodedBlobUrl = null;
+let lastDecodedBlobUrl = null;
+
+const CHUNK_SIZE = 1024 * 1024; // 1 MB
+const MAX_DISPLAY_CHARS = 300000; // cap textarea display to avoid freeze
+
+function setProgress(p){progressBar.style.width = (p*100).toFixed(2) + '%'}
+function humanBytes(n){
+  if(n === 0) return '0 B';
+  const s=['B','KB','MB','GB','TB'];
+  const i = Math.floor(Math.log(n)/Math.log(1024));
+  return (n/Math.pow(1024,i)).toFixed(2)+' '+s[i];
+}
+function showMsg(txt, isErr=false){
+  messages.style.display = 'block';
+  messages.textContent = txt;
+  messages.style.color = isErr ? '#fca5a5' : '#86efac';
+  setTimeout(()=>{ messages.style.display = 'none' }, 6000);
+}
+
+drop.addEventListener('click', ()=> fileInput.click());
+fileInput.addEventListener('change', e=> {
+  if(e.target.files.length) setFile(e.target.files[0]);
+});
+drop.addEventListener('dragover', e=>{ e.preventDefault(); drop.classList.add('drag') });
+drop.addEventListener('dragleave', e=>{ e.preventDefault(); drop.classList.remove('drag') });
+drop.addEventListener('drop', e=>{ e.preventDefault(); drop.classList.remove('drag'); if(e.dataTransfer.files.length) setFile(e.dataTransfer.files[0]); });
+
+function setFile(file){
+  currentFile = file;
+  fileInfo.textContent = `${file.name} · ${humanBytes(file.size)}`;
+  previewImg.style.display = 'none';
+  decodedName.textContent = '—';
+  downloadDecodedBtn.disabled = true;
+  showMsg('Файл выбран: ' + file.name);
+}
+
+function readBlobAsArrayBuffer(blob){
+  return new Promise((res, rej)=>{
+    const fr = new FileReader();
+    fr.onload = ()=> res(fr.result);
+    fr.onerror = ()=> rej(fr.error);
+    fr.readAsArrayBuffer(blob);
+  });
+}
+
+// --- Base85 helpers (Ascii85) ---
+// encode Uint8Array arr to Ascii85 string (without whitespace)
+function encodeBase85Uint8(arr){
+  let out = '';
+  for(let i=0;i<arr.length;i+=4){
+    const remain = Math.min(4, arr.length - i);
+    let val = 0;
+    for(let j=0;j<4;j++){
+      val = (val << 8) | (arr[i + j] || 0);
+    }
+    if(remain === 4){
+      if(val === 0){
+        out += 'z';
+        continue;
+      }
+      const chars = new Array(5);
+      let tmp = val;
+      for(let k=4;k>=0;k--){
+        chars[k] = String.fromCharCode((tmp % 85) + 33);
+        tmp = Math.floor(tmp / 85);
+      }
+      out += chars.join('');
+    } else {
+      // partial: produce 5 chars, then output first (remain+1) chars
+      const chars = new Array(5);
+      let tmp = val;
+      for(let k=4;k>=0;k--){
+        chars[k] = String.fromCharCode((tmp % 85) + 33);
+        tmp = Math.floor(tmp / 85);
+      }
+      out += chars.join('').slice(0, remain + 1);
+    }
+  }
+  return out;
+}
+
+// decode Ascii85 text (cleaned, without whitespace) -> Uint8Array or null on error
+function decodeBase85TextToUint8(text){
+  // Accept 'z' or 'Z' as zero-block
+  const cleaned = text.replace(/\s+/g, '');
+  // validate chars: allowed '!'..'u' and 'z'/'Z'
+  if(!/^[\!\-~zZ]*$/.test(cleaned)) { // quick coarse check: allow printable ASCII and z
+    return {error: 'Base85 содержит недопустимые символы'};
+  }
+  const bytes = [];
+  let block = '';
+  for(let i=0;i<cleaned.length;i++){
+    const ch = cleaned[i];
+    if(ch === 'z' || ch === 'Z'){
+      if(block.length !== 0){
+        return {error: "Неправильное использование 'z' внутри блока base85"};
+      }
+      bytes.push(0,0,0,0);
+      continue;
+    }
+    block += ch;
+    if(block.length === 5){
+      // decode block of 5 chars
+      let val = 0;
+      for(let k=0;k<5;k++){
+        const code = block.charCodeAt(k);
+        if(code < 33 || code > 117) return {error: 'Base85 содержит недопустимые символы'};
+        val = val * 85 + (code - 33);
+      }
+      // extract 4 bytes
+      bytes.push((val >>> 24) & 0xFF, (val >>> 16) & 0xFF, (val >>> 8) & 0xFF, val & 0xFF);
+      block = '';
+    }
+  }
+  if(block.length > 0){
+    // partial block: pad with 'u' (value 84) to length 5
+    const L = block.length; // 1..4
+    if(L === 1) return {error: 'Некорректный завершающий фрагмент base85 (слишком короткий)'};
+    const padNeeded = 5 - L;
+    let val = 0;
+    for(let k=0;k<L;k++){
+      const code = block.charCodeAt(k);
+      if(code < 33 || code > 117) return {error: 'Base85 содержит недопустимые символы'};
+      val = val * 85 + (code - 33);
+    }
+    for(let k=0;k<padNeeded;k++) val = val * 85 + 84; // 'u' == 117 -> 84
+    // now val represents 4 bytes; output first (L-1) bytes
+    const tmp = [(val >>> 24) & 0xFF, (val >>> 16) & 0xFF, (val >>> 8) & 0xFF, val & 0xFF];
+    const outByteCount = L - 1;
+    for(let i=0;i<outByteCount;i++) bytes.push(tmp[i]);
+  }
+  return {uint8: new Uint8Array(bytes)};
+}
+
+// format base85 string into grouped forms (5 chars groups)
+function formatBase85Grouping(s, style){
+  if(style === 'continuous') return s;
+  const parts = [];
+  for(let i=0;i<s.length;i+=5) parts.push(s.slice(i,i+5));
+  if(style === 'grouped') return parts.join('\n');
+  if(style === 'grouped-spaced') return parts.join(' ');
+  return s;
+}
+
+// Encode file: mode = binary|hex|base85
+async function encodeFile(file, mode){
+  if(!file) { showMsg('Нет выбранного файла', true); return; }
+  encodeBtn.disabled = true;
+  decodeBtn.disabled = true;
+  codeArea.value = '';
+  codeMeta.textContent = 'Обработка...';
+  setProgress(0);
+  const parts = [];
+  let displayed = '';
+  let displayedChars = 0;
+  const total = file.size;
+  let processed = 0;
+
+  for(let start=0; start < total; start += CHUNK_SIZE){
+    const slice = file.slice(start, start + CHUNK_SIZE);
+    const buf = await readBlobAsArrayBuffer(slice);
+    const arr = new Uint8Array(buf);
+    if(mode === 'binary'){
+      const arrStr = [];
+      for(let i=0;i<arr.length;i++){
+        arrStr.push(arr[i].toString(2).padStart(8,'0'));
+      }
+      let chunkStr = arrStr.join(displayStyle.value === 'grouped-spaced' ? ' ' : (displayStyle.value === 'grouped' ? '\n' : ''));
+      parts.push(chunkStr);
+      if(displayedChars < MAX_DISPLAY_CHARS){
+        const toAppend = chunkStr.slice(0, MAX_DISPLAY_CHARS - displayedChars);
+        displayed += toAppend;
+        displayedChars += toAppend.length;
+      }
+    } else if(mode === 'hex'){
+      const arrStr = [];
+      for(let i=0;i<arr.length;i++){
+        arrStr.push(arr[i].toString(16).padStart(2,'0'));
+      }
+      let chunkStr = arrStr.join(displayStyle.value === 'grouped-spaced' ? ' ' : (displayStyle.value === 'grouped' ? '\n' : ''));
+      parts.push(chunkStr);
+      if(displayedChars < MAX_DISPLAY_CHARS){
+        const toAppend = chunkStr.slice(0, MAX_DISPLAY_CHARS - displayedChars);
+        displayed += toAppend;
+        displayedChars += toAppend.length;
+      }
+    } else { // base85
+      const chunkStrRaw = encodeBase85Uint8(arr);
+      // apply display grouping for base85
+      const chunkStr = formatBase85Grouping(chunkStrRaw, displayStyle.value);
+      parts.push(chunkStrRaw); // store raw (no whitespace) for accurate download/decoding
+      if(displayedChars < MAX_DISPLAY_CHARS){
+        const displayPart = formatBase85Grouping(chunkStrRaw, displayStyle.value);
+        const toAppend = displayPart.slice(0, MAX_DISPLAY_CHARS - displayedChars);
+        displayed += toAppend;
+        displayedChars += toAppend.length;
+      }
+    }
+
+    processed += arr.length;
+    setProgress(processed / total);
+    codeArea.value = displayed + (displayedChars >= MAX_DISPLAY_CHARS ? '\n\n... (display truncated — скачайте .txt)' : '');
+    codeMeta.textContent = `${file.size} байт → промежуточно обработано ${processed} байт`;
+    await new Promise(r => setTimeout(r, 0)); // yield to UI
+  }
+
+  // assemble final text blob for download
+  let finalText = '';
+  if(mode === 'binary' || mode === 'hex'){
+    finalText = parts.join(displayStyle.value === 'grouped' ? '\n' : (displayStyle.value === 'grouped-spaced' ? ' ' : ''));
+  } else {
+    // parts contain raw base85 segments (no whitespace) -> join without whitespace
+    finalText = parts.join('');
+    // if user requested grouped display, we will format the visible textarea separately (already done)
+  }
+
+  const blob = new Blob([finalText], {type:'text/plain;charset=utf-8'});
+  if(lastEncodedBlobUrl) URL.revokeObjectURL(lastEncodedBlobUrl);
+  lastEncodedBlobUrl = URL.createObjectURL(blob);
+  downloadCodeBtn.href = lastEncodedBlobUrl;
+  downloadCodeBtn.download = `${file.name}.${mode}.txt`;
+  downloadCodeBtn.disabled = false;
+  copyCodeBtn.disabled = false;
+
+  // display final (possibly truncated)
+  if(mode === 'base85'){
+    codeArea.value = formatBase85Grouping(finalText, displayStyle.value).slice(0, MAX_DISPLAY_CHARS) + (finalText.length > MAX_DISPLAY_CHARS ? '\n\n... (display truncated)':'');
+  } else {
+    codeArea.value = finalText.slice(0, MAX_DISPLAY_CHARS) + (finalText.length > MAX_DISPLAY_CHARS ? '\n\n... (display truncated)':'');
+  }
+  codeMeta.textContent = `${file.size} байт → ${finalText.length} символов (${mode})`;
+  setProgress(1);
+  showMsg('Кодирование завершено');
+  encodeBtn.disabled = false;
+  decodeBtn.disabled = false;
+}
+
+// Decode text -> file
+async function decodeTextToFile(text, mode, suggestedName){
+  const raw = text;
+  if(mode === 'binary'){
+    const cleaned = raw.replace(/\s+/g,'');
+    if(!/^[01]*$/.test(cleaned)) { showMsg('Binary содержит недопустимые символы', true); return null; }
+    if(cleaned.length % 8 !== 0) { showMsg('Длина binary должна быть кратна 8', true); return null; }
+    const byteCount = cleaned.length / 8;
+    const arr = new Uint8Array(byteCount);
+    let idx = 0;
+    for(let i=0;i<cleaned.length;i+=8){
+      const byteStr = cleaned.slice(i,i+8);
+      arr[idx++] = parseInt(byteStr, 2);
+      if(idx % (1024*1024) === 0) await new Promise(r=>setTimeout(r,0));
+    }
+    return {uint8:arr, filename: suggestedName || 'restored.bin'};
+  } else if(mode === 'hex'){
+    const cleaned = raw.replace(/\s+/g,'');
+    if(!/^[0-9a-fA-F]*$/.test(cleaned)) { showMsg('Hex содержит недопустимые символы', true); return null; }
+    if(cleaned.length % 2 !== 0) { showMsg('Длина hex должна быть четной', true); return null; }
+    const byteCount = cleaned.length / 2;
+    const arr = new Uint8Array(byteCount);
+    let idx = 0;
+    for(let i=0;i<cleaned.length;i+=2){
+      const byteStr = cleaned.slice(i,i+2);
+      arr[idx++] = parseInt(byteStr, 16);
+      if(idx % (1024*1024) === 0) await new Promise(r=>setTimeout(r,0));
+    }
+    return {uint8:arr, filename: suggestedName || 'restored.bin'};
+  } else { // base85
+    const res = decodeBase85TextToUint8(raw);
+    if(res.error){ showMsg(res.error, true); return null; }
+    return {uint8: res.uint8, filename: suggestedName || 'restored.bin'};
+  }
+}
+
+// UI events
+encodeBtn.addEventListener('click', async ()=>{
+  const mode = document.querySelector('input[name="mode"]:checked').value;
+  if(!currentFile){ showMsg('Выберите файл для кодирования', true); return; }
+  if(currentFile.size > 200 * 1024 * 1024) {
+    if(!confirm('Файл большой (>200 MB). Продолжить?')) return;
+  }
+  await encodeFile(currentFile, mode);
+});
+
+decodeBtn.addEventListener('click', async ()=>{
+  const mode = document.querySelector('input[name="mode"]:checked').value;
+  const text = codeArea.value.trim();
+  if(!text){ showMsg('Вставьте код в поле выше или загрузите .txt', true); return; }
+  decodeBtn.disabled = true;
+  setProgress(0);
+  const res = await decodeTextToFile(text, mode, (currentFile ? currentFile.name : 'restored.bin'));
+  if(!res){ decodeBtn.disabled = false; setProgress(0); return; }
+  const blob = new Blob([res.uint8.buffer], {type:'application/octet-stream'});
+  if(lastDecodedBlobUrl) URL.revokeObjectURL(lastDecodedBlobUrl);
+  lastDecodedBlobUrl = URL.createObjectURL(blob);
+  downloadDecodedBtn.href = lastDecodedBlobUrl;
+  let suggested = res.filename;
+  if(currentFile && currentFile.name){
+    const ext = currentFile.name.split('.').pop();
+    suggested = 'restored.' + ext;
+  }
+  downloadDecodedBtn.download = suggested;
+  downloadDecodedBtn.disabled = false;
+  decodedName.textContent = suggested;
+  previewImg.onload = ()=> { previewImg.style.display = 'block'; URL.revokeObjectURL(previewImg.src); }
+  try {
+    previewImg.src = lastDecodedBlobUrl;
+    previewImg.style.display = 'block';
+  } catch(e){ previewImg.style.display = 'none'; }
+  setProgress(1);
+  showMsg('Декодирование успешно — можно скачать восстановленное');
+  decodeBtn.disabled = false;
+});
+
+downloadCodeBtn.addEventListener('click', ()=>{ if(downloadCodeBtn.disabled) return; });
+
+copyCodeBtn.addEventListener('click', async ()=>{
+  const txt = codeArea.value;
+  if(!txt) return showMsg('Нет текста для копирования', true);
+  try{
+    await navigator.clipboard.writeText(txt);
+    showMsg('Скопировано в буфер обмена');
+  }catch(e){
+    showMsg('Не удалось скопировать: ' + e, true);
+  }
+});
+
+clearCodeBtn.addEventListener('click', ()=> {
+  codeArea.value = '';
+  codeMeta.textContent = '0 байт → 0 символов';
+  downloadCodeBtn.disabled = true;
+  copyCodeBtn.disabled = true;
+  previewImg.style.display = 'none';
+  decodedName.textContent = '—';
+  downloadDecodedBtn.disabled = true;
+  setProgress(0);
+});
+
+loadTxtBtn.addEventListener('click', ()=> {
+  const f = document.createElement('input');
+  f.type = 'file';
+  f.accept = 'text/*';
+  f.onchange = async (e)=>{
+    if(e.target.files.length === 0) return;
+    const file = e.target.files[0];
+    const txt = await file.text();
+    codeArea.value = txt;
+    codeMeta.textContent = `${txt.length} символов загружено`;
+    showMsg('Файл с кодом загружен');
+  };
+  f.click();
+});
+
+exampleSmallBtn.addEventListener('click', async ()=>{
+  const base64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVQImWNgYAAAAAMAAWgmWQ0AAAAASUVORK5CYII=';
+  const binary = atob(base64);
+  const arr = new Uint8Array(binary.length);
+  for(let i=0;i<binary.length;i++) arr[i] = binary.charCodeAt(i);
+  const blob = new Blob([arr], {type:'image/png'});
+  const f = new File([blob],'tiny.png',{type:'image/png'});
+  setFile(f);
+  const mode = document.querySelector('input[name="mode"]:checked').value;
+  await encodeFile(f, mode);
+});
+
+clearAllBtn.addEventListener('click', ()=>{
+  currentFile = null;
+  fileInput.value = '';
+  fileInfo.textContent = 'Нет файла';
+  codeArea.value = '';
+  codeMeta.textContent = '0 байт → 0 символов';
+  previewImg.style.display = 'none';
+  decodedName.textContent = '—';
+  downloadCodeBtn.disabled = true;
+  copyCodeBtn.disabled = true;
+  downloadDecodedBtn.disabled = true;
+  setProgress(0);
+  showMsg('Очистил всё');
+});
+
+codeArea.addEventListener('input', ()=> {
+  codeMeta.textContent = `${currentFile ? currentFile.size + ' байт · ' : ''}${codeArea.value.length} символов`;
+  downloadCodeBtn.disabled = codeArea.value.length === 0;
+  copyCodeBtn.disabled = codeArea.value.length === 0;
+});
+</script>
+</body>
+</html>
