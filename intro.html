@@ -35,13 +35,13 @@
 <body>
 <div class="wrap">
   <h1>Заставка канала</h1>
-  <p class="sub">5 секунд, 1920×1080. Меняй текст и цвет, потом записывай видео.</p>
+  <p class="sub">10 секунд, 1920×1080. Меняй текст и цвет, потом записывай видео.</p>
   <div class="layout">
     <div class="stage">
       <canvas id="c" width="1920" height="1080"></canvas>
       <div class="bar">
         <button class="btn" id="play">▶ Играть</button>
-        <input type="range" id="seek" min="0" max="5" step="0.01" value="3.6" aria-label="Время">
+        <input type="range" id="seek" min="0" max="10" step="0.01" value="3.6" aria-label="Время">
         <span class="hint" id="time">3.60 с</span>
       </div>
     </div>
@@ -54,14 +54,14 @@
       </div>
       <label class="chk"><input type="checkbox" id="sound" checked> Звук (файл intro-sound.wav рядом)</label>
       <button class="btn primary" id="rec">Записать видео (.webm)</button>
-      <p class="hint" id="recHint">Запись идёт 5 секунд в реальном времени. Готовое MP4 со звуком лежит в папке intro/.</p>
+      <p class="hint" id="recHint">Запись идёт 10 секунд в реальном времени. Готовое MP4 со звуком лежит в папке intro/.</p>
     </div>
   </div>
 </div>
 <audio id="snd" src="intro/intro-sound.wav" preload="auto"></audio>
 
 <script>
-const W = 1920, H = 1080, DUR = 5.0;
+const W = 1920, H = 1080, DUR = 10.0;
 const cv = document.getElementById('c');
 const ctx = cv.getContext('2d');
 
@@ -118,7 +118,7 @@ function travel(t) {
 }
 function speed(t) {
   const burst = Math.exp(-Math.pow((t - 0.9) / 0.45, 2)) * 5.5;
-  const outro = easeInCubic(prog(t, 4.3, 5.0)) * 7;
+  const outro = easeInCubic(prog(t, 9.3, 10.0)) * 7 + Math.exp(-Math.pow((t - 4.7) / 0.25, 2)) * 2 + Math.exp(-Math.pow((t - 7.4) / 0.25, 2)) * 2;
   return 0.35 + burst + outro;
 }
 
@@ -337,7 +337,10 @@ function tagline(p, t, L) {
   const k = prog(t, 3.2, 3.2 + chars.length * 0.035);
   if (k <= 0) return;
   const n = Math.floor(chars.length * k + 0.0001);
+  const fade = 1 - prog(t, 4.3, 4.55);
+  if (fade <= 0) return;
   ctx.save();
+  ctx.globalAlpha = fade;
   ctx.font = '800 54px "JetBrains Mono", monospace';
   ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
   const full = ctx.measureText(text).width;
@@ -355,9 +358,215 @@ function tagline(p, t, L) {
   ctx.restore();
 }
 
+/* ---------- cards: САЙТЫ / ИГРЫ / ИИ ---------- */
+const CARD_STARTS = [4.73, 5.23, 5.73];      // lands ≈ start + 0.27 → on the beat (5.0 / 5.5 / 6.0)
+const CARD_LANDS = CARD_STARTS.map(s => s + 0.27);
+function cardLabels() {
+  const parts = S.tag.split(/[·•|,]/).map(s => s.trim().toUpperCase()).filter(Boolean);
+  const def = ['САЙТЫ', 'ИГРЫ', 'ИИ'];
+  return [0, 1, 2].map(i => parts[i] || def[i]);
+}
+
+function sceneCode(p, lt) {
+  ['#ff5f57', '#febc2e', '#28c840'].forEach((c, i) => {
+    ctx.beginPath(); ctx.arc(-170 + i * 26, -118, 8, 0, Math.PI * 2); ctx.fillStyle = c; ctx.fill();
+  });
+  const rows = [
+    [[0, 70, '#c678dd'], [80, 120, '#e5c07b']],
+    [[30, 90, '#61afef'], [130, 150, '#98c379']],
+    [[30, 60, '#e06c75'], [100, 80, '#d19a66'], [190, 60, '#abb2bf']],
+    [[60, 140, '#98c379']],
+    [[30, 110, '#61afef'], [150, 70, '#e5c07b']],
+    [[0, 70, '#c678dd']],
+  ];
+  let budget = clamp(lt / 1.6) * 900; // characters "typed"
+  rows.forEach((row, j) => {
+    row.forEach(([x, w, c]) => {
+      const vis = clamp(budget / w);
+      budget -= w;
+      if (vis <= 0) return;
+      rr(-180 + x, -84 + j * 30, w * vis, 16, 8);
+      ctx.fillStyle = c; ctx.fill();
+    });
+  });
+  if (Math.floor(lt * 4) % 2 === 0) { ctx.fillStyle = p.a; ctx.fillRect(-180, 96, 12, 22); }
+}
+
+function sceneGame(p, lt) {
+  const n = 5, m = 3, s = 62, g = 8;
+  const x0 = -(n * s + (n - 1) * g) / 2, y0 = -128;
+  const nums = ['1', '2', '', '1', '3', '', '1', '2', '1', '', '2', '1', '', '1', '2'];
+  const cols = { 1: '#4da3ff', 2: '#39ff88', 3: '#ff3d6e' };
+  const order = [7, 2, 11, 5, 13, 0, 9, 3, 14, 6, 1, 12, 8, 4, 10];
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = '900 30px "Unbounded", sans-serif';
+  for (let j = 0; j < m; j++) for (let i = 0; i < n; i++) {
+    const idx = j * n + i;
+    const x = x0 + i * (s + g), y = y0 + j * (s + g);
+    const openAt = order.indexOf(idx) * 0.11 + 0.15;
+    const op = lt > openAt && idx !== 4 && idx !== 10;
+    rr(x, y, s, s, 10);
+    ctx.fillStyle = op ? '#20202f' : '#3c3c56'; ctx.fill();
+    if (op && nums[idx]) { ctx.fillStyle = cols[nums[idx]]; ctx.fillText(nums[idx], x + s / 2, y + s / 2 + 2); }
+    if (idx === 4 || idx === 10) {
+      ctx.fillStyle = '#fff'; ctx.fillRect(x + 26, y + 14, 4, 34);
+      ctx.beginPath(); ctx.moveTo(x + 30, y + 14); ctx.lineTo(x + 48, y + 22); ctx.lineTo(x + 30, y + 30); ctx.closePath();
+      ctx.fillStyle = '#ff3d6e'; ctx.fill();
+    }
+  }
+}
+
+function sceneChat(p, lt) {
+  const msgs = [
+    { me: true, w: 170, at: 0.1 },
+    { me: false, w: 250, at: 0.55 },
+    { me: true, w: 120, at: 1.0 },
+  ];
+  msgs.forEach((m, i) => {
+    const k = easeOutBack(prog(lt, m.at, m.at + 0.3));
+    if (k <= 0) return;
+    const y = -112 + i * 64;
+    const x = m.me ? 180 - m.w : -180;
+    ctx.save();
+    ctx.translate(x + (m.me ? m.w : 0), y + 22); ctx.scale(k, k); ctx.translate(-(x + (m.me ? m.w : 0)), -(y + 22));
+    rr(x, y, m.w, 44, 18);
+    ctx.fillStyle = m.me ? p.a : '#2c2c40'; ctx.fill();
+    ctx.fillStyle = m.me ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.55)';
+    rr(x + 16, y + 17, m.w * 0.6, 10, 5); ctx.fill();
+    ctx.restore();
+  });
+  // typing dots
+  if (lt > 1.3) {
+    rr(-180, 82, 96, 40, 18); ctx.fillStyle = '#2c2c40'; ctx.fill();
+    for (let i = 0; i < 3; i++) {
+      const b = Math.max(0, Math.sin(lt * 9 - i * 0.9)) * 6;
+      ctx.beginPath(); ctx.arc(-156 + i * 24, 102 - b, 6, 0, Math.PI * 2);
+      ctx.fillStyle = '#c8c8e0'; ctx.fill();
+    }
+  }
+}
+
+function cards(p, t) {
+  const labels = cardLabels();
+  const scenes = [sceneCode, sceneGame, sceneChat];
+  for (let i = 0; i < 3; i++) {
+    const s = CARD_STARTS[i];
+    const kin = prog(t, s, s + 0.55);
+    if (kin <= 0) continue;
+    const kout = easeInCubic(prog(t, 7.1 + i * 0.07, 7.55 + i * 0.07));
+    if (kout >= 1) continue;
+    const e = easeOutBack(kin);
+    const cx = W / 2 + (i - 1) * 560;
+    const cy = lerp(H + 360, 610, e) + kout * 900 + Math.sin(t * 2.2 + i * 1.3) * 7 * kin;
+    const rot = lerp((i - 1) * 0.5 + 0.3, (i - 1) * 0.045, easeOutCubic(kin)) + kout * (i - 1 || 1) * 0.6;
+    ctx.save();
+    ctx.translate(cx, cy); ctx.rotate(rot);
+    ctx.globalAlpha = 1 - kout * 0.6;
+    // card body
+    ctx.shadowColor = p.b; ctx.shadowBlur = 50;
+    rr(-230, -170, 460, 340, 30);
+    ctx.fillStyle = '#12121c'; ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(255,255,255,0.16)'; ctx.stroke();
+    // scene
+    ctx.save();
+    rr(-230, -170, 460, 340, 30); ctx.clip();
+    scenes[i](p, t - CARD_LANDS[i]);
+    ctx.restore();
+    // label pill
+    ctx.font = '900 44px "Unbounded", sans-serif';
+    const lw = Math.max(ctx.measureText(labels[i]).width + 64, 170);
+    ctx.save();
+    ctx.translate(0, 170); ctx.rotate(-0.03);
+    ctx.shadowColor = p.a; ctx.shadowBlur = 30;
+    rr(-lw / 2, -40, lw, 80, 40);
+    ctx.fillStyle = p.a; ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#111'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(labels[i], 0, 3);
+    ctx.restore();
+    ctx.restore();
+  }
+}
+
+/* ---------- subscribe button + cursor click ---------- */
+const CLICK_T = 8.75;
+function bell(x, y, sc, rot, col) {
+  ctx.save();
+  ctx.translate(x, y); ctx.rotate(rot); ctx.scale(sc, sc);
+  ctx.fillStyle = col;
+  ctx.beginPath();
+  ctx.moveTo(-20, 12);
+  ctx.quadraticCurveTo(-16, 6, -16, -4);
+  ctx.arc(0, -4, 16, Math.PI, 0);
+  ctx.quadraticCurveTo(16, 6, 20, 12);
+  ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.arc(0, 18, 6, 0, Math.PI * 2); ctx.fill();
+  ctx.fillRect(-3, -26, 6, 8);
+  ctx.restore();
+}
+
+function subscribe(p, t, L) {
+  const kin = prog(t, 7.95, 8.35);
+  if (kin <= 0) return;
+  const e = easeOutBack(kin);
+  const cx = W / 2, cy = L.cy + L.fs * 0.62 + 160;
+  const done = t >= CLICK_T;
+  const label = done ? 'ВЫ ПОДПИСАНЫ' : 'ПОДПИСАТЬСЯ';
+  ctx.save();
+  ctx.font = '800 42px "Unbounded", sans-serif';
+  const bw = ctx.measureText(label).width + 170, bh = 104;
+  const press = 1 - 0.08 * Math.sin(Math.PI * prog(t, CLICK_T - 0.06, CLICK_T + 0.12));
+  ctx.translate(cx, cy); ctx.scale(e * press, e * press);
+  ctx.shadowColor = done ? 'rgba(0,0,0,0.5)' : '#ff0033'; ctx.shadowBlur = done ? 10 : 45;
+  rr(-bw / 2, -bh / 2, bw, bh, bh / 2);
+  ctx.fillStyle = done ? '#2b2b38' : '#ff0033'; ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.lineWidth = 4; ctx.strokeStyle = done ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.9)'; ctx.stroke();
+  // icon
+  const ix = -bw / 2 + 62;
+  if (done) {
+    const ring = Math.sin((t - CLICK_T) * 28) * 0.45 * Math.exp(-(t - CLICK_T) * 3.5);
+    bell(ix, -2, 1.05, ring, p.a);
+  } else {
+    bell(ix, -2, 1.05, 0, '#fff');
+  }
+  ctx.fillStyle = '#fff'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  ctx.fillText(label, ix + 44, 3);
+  // ripple
+  const rk = prog(t, CLICK_T, CLICK_T + 0.5);
+  if (rk > 0 && rk < 1) {
+    ctx.save();
+    rr(-bw / 2, -bh / 2, bw, bh, bh / 2); ctx.clip();
+    ctx.globalAlpha = (1 - rk) * 0.5;
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(110, 20, easeOutCubic(rk) * bw, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+  ctx.restore();
+
+  // cursor
+  const mk = easeInOut(prog(t, 8.15, 8.68));
+  const cout = prog(t, 9.05, 9.3);
+  if (mk > 0 && cout < 1) {
+    const tx = cx + 110, ty = cy + 20;
+    const x = lerp(W * 0.86, tx, mk), y = lerp(H + 60, ty, mk) + Math.sin(mk * Math.PI) * -60;
+    const cs = 1 - 0.18 * Math.sin(Math.PI * prog(t, CLICK_T - 0.06, CLICK_T + 0.12));
+    ctx.save();
+    ctx.globalAlpha = 1 - cout;
+    ctx.translate(x, y); ctx.scale(1.5 * cs, 1.5 * cs);
+    ctx.beginPath();
+    ctx.moveTo(0, 0); ctx.lineTo(0, 36); ctx.lineTo(9, 28); ctx.lineTo(16, 43); ctx.lineTo(22, 40);
+    ctx.lineTo(15, 26); ctx.lineTo(27, 26); ctx.closePath();
+    ctx.fillStyle = '#fff'; ctx.fill();
+    ctx.lineWidth = 2.5; ctx.strokeStyle = '#000'; ctx.lineJoin = 'round'; ctx.stroke();
+    ctx.restore();
+  }
+}
+
 function glitch(t) {
   // short bursts
-  const bursts = [[1.42, 0.08], [2.98, 0.14], [4.02, 0.08], [4.62, 0.1]];
+  const bursts = [[1.42, 0.08], [2.98, 0.14], [4.45, 0.08], [7.15, 0.12], [9.6, 0.1]];
   let amt = 0;
   for (const [s, d] of bursts) if (t >= s && t < s + d) amt = 1;
   if (!amt) return;
@@ -407,31 +616,44 @@ function renderAt(t) {
   warp(p, t, d);
 
   // outro zoom into the badge
-  const zk = easeInCubic(prog(t, 4.35, 4.95));
+  const zk = easeInCubic(prog(t, 9.35, 9.95));
   ctx.save();
   if (zk > 0) {
     const fx = L.badgeX, fy = L.cy;
     ctx.translate(fx, fy); ctx.scale(1 + zk * 6, 1 + zk * 6); ctx.translate(-fx, -fy);
   }
   // camera shake on impacts
-  const shake = Math.exp(-Math.pow((t - 1.45) / 0.08, 2)) * 14 + Math.exp(-Math.pow((t - 2.5) / 0.15, 2)) * 5;
+  let shake = Math.exp(-Math.pow((t - 1.45) / 0.08, 2)) * 14 + Math.exp(-Math.pow((t - 2.5) / 0.15, 2)) * 5;
+  for (const land of CARD_LANDS) shake += Math.exp(-Math.pow((t - land) / 0.06, 2)) * 7;
   if (shake > 0.3) { const r = rng(Math.floor(t * 120)); ctx.translate((r() - .5) * shake, (r() - .5) * shake); }
   snippets(p, t);
+
+  // the name lock-up shrinks to the top while the cards play, then comes back
+  const lk = easeInOut(prog(t, 4.45, 4.95)) - easeInOut(prog(t, 7.35, 7.95));
+  ctx.save();
+  if (lk > 0) {
+    const s = lerp(1, 0.5, lk);
+    ctx.translate(W / 2, lerp(L.cy, 170, lk)); ctx.scale(s, s); ctx.translate(-W / 2, -L.cy);
+  }
   letterLayer(p, t, L);
   underline(p, t, L);
   tagline(p, t, L);
   badgeLayer(p, t, L);
   ctx.restore();
 
+  cards(p, t);
+  subscribe(p, t, L);
+  ctx.restore();
+
   glitch(t);
   scanlines();
 
   // white flash on badge impact and at the end
-  const flash = Math.exp(-Math.pow((t - 1.42) / 0.05, 2)) * 0.55 + Math.exp(-Math.pow((t - 4.82) / 0.07, 2)) * 0.95;
+  const flash = Math.exp(-Math.pow((t - 1.42) / 0.05, 2)) * 0.55 + Math.exp(-Math.pow((t - 9.82) / 0.07, 2)) * 0.95;
   if (flash > 0.01) { ctx.fillStyle = `rgba(255,255,255,${clamp(flash)})`; ctx.fillRect(0, 0, W, H); }
   // fade from / to black
   const fadeIn = 1 - prog(t, 0, 0.25);
-  const fadeOut = prog(t, 4.86, 5.0);
+  const fadeOut = prog(t, 9.86, 10.0);
   const blk = Math.max(fadeIn, fadeOut);
   if (blk > 0) { ctx.fillStyle = `rgba(0,0,0,${blk})`; ctx.fillRect(0, 0, W, H); }
 }
