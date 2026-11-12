@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Заставка канала</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;800;900&family=JetBrains+Mono:wght@700;800&display=swap" rel="stylesheet">
+<style>
+  :root { --bg:#0d0d14; --panel:#171722; --line:#2a2a3a; --text:#ececf4; --muted:#9a9ab0; --accent:#ffd400; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--text); font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif; min-height:100vh; }
+  .wrap { max-width:1400px; margin:0 auto; padding:24px 16px 48px; }
+  h1 { font:800 22px "Unbounded",sans-serif; margin-bottom:4px; }
+  .sub { color:var(--muted); margin-bottom:20px; }
+  .layout { display:grid; grid-template-columns:minmax(0,1fr) 320px; gap:20px; align-items:start; }
+  @media (max-width:960px) { .layout { grid-template-columns:1fr; } }
+  .stage { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:12px; }
+  canvas { width:100%; height:auto; display:block; border-radius:8px; aspect-ratio:16/9; background:#000; }
+  .bar { display:flex; gap:10px; align-items:center; margin-top:10px; }
+  .bar input[type=range] { flex:1; accent-color:var(--accent); }
+  .controls { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:16px; display:grid; gap:14px; }
+  label { display:grid; gap:6px; font-size:13px; color:var(--muted); }
+  input[type=text] { width:100%; background:#0f0f18; color:var(--text); border:1px solid var(--line); border-radius:8px; padding:9px 10px; font:inherit; font-size:14px; }
+  .btn { background:#0f0f18; color:var(--text); border:1px solid var(--line); border-radius:8px; padding:9px 12px; font:inherit; font-size:14px; cursor:pointer; }
+  .btn.primary { background:var(--accent); color:#111; border:none; font-weight:700; padding:12px; }
+  .btn:disabled { opacity:.5; cursor:default; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; }
+  .swatch { width:32px; height:32px; border-radius:50%; border:2px solid transparent; cursor:pointer; }
+  .swatch[aria-pressed=true] { border-color:#fff; }
+  .hint { font-size:12px; color:var(--muted); }
+  .chk { display:flex; gap:8px; align-items:center; color:var(--text); font-size:14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Заставка канала</h1>
+  <p class="sub">5 секунд, 1920×1080. Меняй текст и цвет, потом записывай видео.</p>
+  <div class="layout">
+    <div class="stage">
+      <canvas id="c" width="1920" height="1080"></canvas>
+      <div class="bar">
+        <button class="btn" id="play">▶ Играть</button>
+        <input type="range" id="seek" min="0" max="5" step="0.01" value="3.6" aria-label="Время">
+        <span class="hint" id="time">3.60 с</span>
+      </div>
+    </div>
+    <div class="controls">
+      <label>Название канала <input type="text" id="name" value="VANYASSIA" maxlength="16"></label>
+      <label>Подпись <input type="text" id="tag" value="САЙТЫ · ИГРЫ · ИИ" maxlength="32"></label>
+      <div>
+        <div class="hint" style="margin-bottom:6px">Цвет</div>
+        <div class="row" id="colors"></div>
+      </div>
+      <label class="chk"><input type="checkbox" id="sound" checked> Звук (файл intro-sound.wav рядом)</label>
+      <button class="btn primary" id="rec">Записать видео (.webm)</button>
+      <p class="hint" id="recHint">Запись идёт 5 секунд в реальном времени. Готовое MP4 со звуком лежит в папке intro/.</p>
+    </div>
+  </div>
+</div>
+<audio id="snd" src="intro/intro-sound.wav" preload="auto"></audio>
+
+<script>
+const W = 1920, H = 1080, DUR = 5.0;
+const cv = document.getElementById('c');
+const ctx = cv.getContext('2d');
+
+const PALETTES = [
+  { a:'#ffd400', b:'#7b2ff7', c:'#0b0620' },
+  { a:'#39ff88', b:'#0066ff', c:'#020b18' },
+  { a:'#ff3d6e', b:'#ff9a00', c:'#1a0508' },
+  { a:'#00e5ff', b:'#e100ff', c:'#0a0418' },
+];
+const S = { name:'VANYASSIA', tag:'САЙТЫ · ИГРЫ · ИИ', pal:0 };
+
+/* ---------- math ---------- */
+const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+const prog = (t, a, b) => clamp((t - a) / (b - a));
+const lerp = (a, b, k) => a + (b - a) * k;
+const easeOutCubic = k => 1 - Math.pow(1 - k, 3);
+const easeInCubic = k => k * k * k;
+const easeInOut = k => k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+const easeOutBack = k => { const c1 = 1.9, c3 = c1 + 1; return 1 + c3 * Math.pow(k - 1, 3) + c1 * Math.pow(k - 1, 2); };
+const easeOutElastic = k => k === 0 ? 0 : k === 1 ? 1 : Math.pow(2, -10 * k) * Math.sin((k * 10 - .75) * (2 * Math.PI) / 3) + 1;
+function rng(seed) { let s = seed >>> 0 || 1; return () => (s = (s * 16807) % 2147483647) / 2147483647; }
+function hexA(hex, a) {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`;
+}
+function rr(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+/* ---------- static data ---------- */
+const R = rng(42);
+const STARS = Array.from({ length: 260 }, () => ({ x: (R() - .5) * 2.4, y: (R() - .5) * 1.4, z: R() }));
+const SNIPPETS = [
+  { s: 0.25, t: '<html>', x: -0.9, y: -0.45, col: '#e06c75' },
+  { s: 0.45, t: 'ai.build()', x: 0.85, y: 0.35, col: '#61afef' },
+  { s: 0.62, t: 'game.start()', x: -0.75, y: 0.5, col: '#98c379' },
+  { s: 0.78, t: '{ }', x: 0.7, y: -0.5, col: '#c678dd' },
+  { s: 0.92, t: 'const ai', x: 0.05, y: -0.75, col: '#e5c07b' },
+];
+
+/* ---------- speed curve (for warp + grid) ---------- */
+// integral of speed so motion is continuous
+function travel(t) {
+  // fast 0.2–1.4, calm afterwards, fast again in the outro
+  let d = 0; const dt = 1 / 240;
+  for (let x = 0; x < t; x += dt) d += speed(x) * dt;
+  return d;
+}
+function speed(t) {
+  const burst = Math.exp(-Math.pow((t - 0.9) / 0.45, 2)) * 5.5;
+  const outro = easeInCubic(prog(t, 4.3, 5.0)) * 7;
+  return 0.35 + burst + outro;
+}
+
+/* ---------- layers ---------- */
+function background(p, t) {
+  const g = ctx.createLinearGradient(0, 0, W, H);
+  g.addColorStop(0, p.c); g.addColorStop(1, '#000');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+
+  const breathe = 0.85 + 0.15 * Math.sin(t * 3);
+  const glowIn = easeOutCubic(prog(t, 0.0, 1.4));
+  const rg = ctx.createRadialGradient(W / 2, H * 0.47, 10, W / 2, H * 0.47, 900);
+  rg.addColorStop(0, hexA(p.b, 0.75 * glowIn * breathe));
+  rg.addColorStop(0.5, hexA(p.b, 0.22 * glowIn));
+  rg.addColorStop(1, hexA(p.b, 0));
+  ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H);
+}
+
+function gridFloor(p, t, dist) {
+  const appear = easeOutCubic(prog(t, 0.05, 0.8));
+  if (appear <= 0) return;
+  const horizon = 760, vx = W / 2;
+  ctx.save();
+  ctx.globalAlpha = appear;
+  ctx.strokeStyle = hexA(p.b, 0.6);
+  ctx.lineWidth = 2;
+  for (let i = -20; i <= 20; i++) {
+    ctx.beginPath(); ctx.moveTo(vx, horizon); ctx.lineTo(vx + i * 210, H + 40); ctx.stroke();
+  }
+  const phase = (dist * 1.4) % 1;
+  for (let k = 0; k < 12; k++) {
+    const u = (k + phase) / 12;
+    const y = horizon + Math.pow(u, 2.4) * (H - horizon + 40);
+    ctx.globalAlpha = appear * clamp(u * 1.6);
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+  // horizon flash line
+  const flash = Math.exp(-Math.pow((t - 0.35) / 0.18, 2));
+  ctx.globalAlpha = appear * (0.5 + flash);
+  const hl = ctx.createLinearGradient(0, 0, W, 0);
+  hl.addColorStop(0, hexA(p.a, 0)); hl.addColorStop(0.5, p.a); hl.addColorStop(1, hexA(p.a, 0));
+  ctx.fillStyle = hl;
+  ctx.fillRect(0, horizon - 2, W, 4);
+  ctx.restore();
+  // fade floor into dark at horizon
+  const fg = ctx.createLinearGradient(0, horizon - 1, 0, horizon + 140);
+  fg.addColorStop(0, 'rgba(0,0,0,0.0)');
+  fg.addColorStop(0, 'rgba(0,0,0,0.55)');
+  fg.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = fg; ctx.fillRect(0, horizon, W, 140);
+}
+
+function warp(p, t, dist) {
+  const sp = speed(t);
+  ctx.save();
+  ctx.lineCap = 'round';
+  for (const s of STARS) {
+    const z = ((s.z - dist * 0.25) % 1 + 1) % 1 + 0.02;
+    const zPrev = z + 0.004 * sp;
+    const x = W / 2 + (s.x / z) * 300, y = H * 0.47 + (s.y / z) * 300;
+    const xp = W / 2 + (s.x / zPrev) * 300, yp = H * 0.47 + (s.y / zPrev) * 300;
+    if (x < -50 || x > W + 50 || y < -50 || y > H + 50) continue;
+    const a = clamp((1 - z) * 1.2) * clamp(t / 0.3);
+    ctx.strokeStyle = `rgba(255,255,255,${a * 0.8})`;
+    ctx.lineWidth = clamp((1 - z) * 4, 0.6, 4);
+    ctx.beginPath(); ctx.moveTo(xp, yp); ctx.lineTo(x, y); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function snippets(p, t) {
+  ctx.save();
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (const sn of SNIPPETS) {
+    const k = prog(t, sn.s, sn.s + 0.75);
+    if (k <= 0 || k >= 1) continue;
+    const z = lerp(1, 0.08, easeInCubic(k));
+    const sc = Math.min(0.34 / z, 3.5);
+    const x = W / 2 + sn.x * 330 * sc, y = H * 0.47 + sn.y * 260 * sc;
+    const a = Math.sin(k * Math.PI);
+    ctx.globalAlpha = a;
+    ctx.font = `800 ${Math.round(64 * sc)}px "JetBrains Mono", monospace`;
+    ctx.shadowColor = sn.col; ctx.shadowBlur = 30;
+    ctx.fillStyle = sn.col;
+    ctx.fillText(sn.t, x, y);
+  }
+  ctx.restore();
+}
+
+/* layout of the final lock-up */
+function layout() {
+  ctx.font = '900 168px "Unbounded", sans-serif';
+  const name = S.name.trim().toUpperCase() || ' ';
+  const letters = [...name];
+  const widths = letters.map(ch => ctx.measureText(ch).width);
+  let textW = widths.reduce((a, b) => a + b, 0);
+  let fs = 168;
+  const badge = 200, gap = 54;
+  const maxText = W - 260 - badge - gap;
+  if (textW > maxText) { fs = Math.floor(168 * maxText / textW); }
+  ctx.font = `900 ${fs}px "Unbounded", sans-serif`;
+  const ws = letters.map(ch => ctx.measureText(ch).width);
+  textW = ws.reduce((a, b) => a + b, 0);
+  const groupW = badge + gap + textW;
+  const x0 = (W - groupW) / 2;
+  const cy = 500;
+  const pos = []; let x = x0 + badge + gap;
+  ws.forEach(w => { pos.push(x); x += w; });
+  return { fs, letters, ws, pos, textW, badge, badgeX: x0 + badge / 2, cy, textX: x0 + badge + gap };
+}
+
+function drawBadge(p, x, y, size, rot, glow) {
+  ctx.save();
+  ctx.translate(x, y); ctx.rotate(rot);
+  ctx.shadowColor = p.a; ctx.shadowBlur = 60 * glow;
+  rr(-size / 2, -size * 0.4, size, size * 0.8, size * 0.19);
+  ctx.fillStyle = p.a; ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#111';
+  ctx.font = `900 ${Math.round(size * 0.38)}px "JetBrains Mono", monospace`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('</>', 0, size * 0.03);
+  ctx.restore();
+}
+
+function badgeLayer(p, t, L) {
+  const k1 = prog(t, 1.2, 1.75);          // pop in at centre
+  if (k1 <= 0) return;
+  const k2 = easeInOut(prog(t, 1.85, 2.35)); // slide to the left of the name
+  const pop = easeOutElastic(k1);
+  const cx = lerp(W / 2, L.badgeX, k2);
+  const cy = lerp(H * 0.46, L.cy - 4, k2);
+  const size = L.badge * lerp(1.7, 1, k2) * pop;
+  const rot = lerp(-0.5, 0, easeOutCubic(k1)) + lerp(0, -0.06, k2) + Math.sin(t * 2.2) * 0.02 * k2;
+  // shockwave ring at impact
+  const ring = prog(t, 1.32, 1.9);
+  if (ring > 0 && ring < 1) {
+    ctx.save();
+    ctx.globalAlpha = 1 - ring;
+    ctx.strokeStyle = p.a; ctx.lineWidth = 10 * (1 - ring) + 1;
+    ctx.beginPath(); ctx.arc(W / 2, H * 0.46, 120 + easeOutCubic(ring) * 900, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+  }
+  const glow = 1 + Math.exp(-Math.pow((t - 1.45) / 0.15, 2)) * 1.5;
+  drawBadge(p, cx, cy, size, rot, glow);
+}
+
+function letterLayer(p, t, L) {
+  const start = 2.05, stagger = 0.065, dur = 0.5;
+  ctx.save();
+  ctx.font = `900 ${L.fs}px "Unbounded", sans-serif`;
+  ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+  ctx.lineJoin = 'round';
+  const baseY = L.cy + L.fs * 0.04;
+  L.letters.forEach((ch, i) => {
+    const k = prog(t, start + i * stagger, start + i * stagger + dur);
+    if (k <= 0) return;
+    const e = easeOutBack(k);
+    const dy = lerp(-H * 0.75, 0, e);
+    const rot = lerp(i % 2 ? 0.5 : -0.5, 0, easeOutCubic(k));
+    const sc = lerp(1.6, 1, easeOutCubic(k));
+    const x = L.pos[i] + L.ws[i] / 2, y = baseY + dy;
+    // idle float
+    const fl = Math.sin(t * 3 + i * 0.6) * 4 * prog(t, 3.2, 3.6);
+    ctx.save();
+    ctx.translate(x, y + fl); ctx.rotate(rot); ctx.scale(sc, sc);
+    ctx.globalAlpha = clamp(k * 3);
+    ctx.fillStyle = '#000';
+    ctx.fillText(ch, -L.ws[i] / 2 + 8, 12);
+    ctx.lineWidth = L.fs * 0.1; ctx.strokeStyle = '#000';
+    ctx.strokeText(ch, -L.ws[i] / 2, 0);
+    ctx.fillStyle = '#fff';
+    ctx.fillText(ch, -L.ws[i] / 2, 0);
+    ctx.restore();
+    // landing dust spark
+    const land = prog(t, start + i * stagger + dur * 0.45, start + i * stagger + dur * 0.45 + 0.35);
+    if (land > 0 && land < 1) {
+      ctx.save();
+      ctx.globalAlpha = (1 - land) * 0.9;
+      ctx.fillStyle = p.a;
+      for (let j = 0; j < 6; j++) {
+        const ang = Math.PI + (j / 5) * Math.PI;
+        const r = easeOutCubic(land) * 60;
+        ctx.beginPath();
+        ctx.arc(x + Math.cos(ang) * r * 1.3, baseY + L.fs * 0.42 + Math.sin(ang) * r * 0.5, 5 * (1 - land) + 1, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+  });
+  ctx.restore();
+}
+
+function underline(p, t, L) {
+  const k = easeInOut(prog(t, 2.95, 3.35));
+  if (k <= 0) return;
+  const y = L.cy + L.fs * 0.62;
+  ctx.save();
+  ctx.shadowColor = p.a; ctx.shadowBlur = 25;
+  ctx.fillStyle = p.a;
+  const w = L.textW * k;
+  rr(L.textX, y, Math.max(w, 1), 14, 7);
+  ctx.fill();
+  // sweeping highlight
+  if (k < 1) {
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(L.textX + w, y + 7, 12, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+}
+
+function tagline(p, t, L) {
+  const text = S.tag.trim().toUpperCase();
+  if (!text) return;
+  const chars = [...text];
+  const k = prog(t, 3.2, 3.2 + chars.length * 0.035);
+  if (k <= 0) return;
+  const n = Math.floor(chars.length * k + 0.0001);
+  ctx.save();
+  ctx.font = '800 54px "JetBrains Mono", monospace';
+  ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+  const full = ctx.measureText(text).width;
+  const x = W / 2 - full / 2, y = L.cy + L.fs * 0.62 + 110;
+  ctx.letterSpacing = '0px';
+  const shown = chars.slice(0, n).join('');
+  ctx.fillStyle = 'rgba(255,255,255,0.92)';
+  ctx.fillText(shown, x, y);
+  // cursor
+  const cw = ctx.measureText(shown).width;
+  if (Math.floor(t * 4) % 2 === 0 || k < 1) {
+    ctx.fillStyle = p.a;
+    ctx.fillRect(x + cw + 6, y - 28, 26, 56);
+  }
+  ctx.restore();
+}
+
+function glitch(t) {
+  // short bursts
+  const bursts = [[1.42, 0.08], [2.98, 0.14], [4.02, 0.08], [4.62, 0.1]];
+  let amt = 0;
+  for (const [s, d] of bursts) if (t >= s && t < s + d) amt = 1;
+  if (!amt) return;
+  const r = rng(Math.floor(t * 60) + 7);
+  // RGB split
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.globalAlpha = 0.35;
+  ctx.drawImage(cv, 14, 0);
+  ctx.drawImage(cv, -14, 0);
+  ctx.restore();
+  // slice displacement
+  for (let i = 0; i < 9; i++) {
+    const y = Math.floor(r() * H), h = Math.floor(10 + r() * 70), dx = Math.floor((r() - .5) * 140);
+    ctx.drawImage(cv, 0, y, W, h, dx, y, W, h);
+  }
+}
+
+function scanlines() {
+  ctx.save();
+  ctx.globalAlpha = 0.07;
+  ctx.fillStyle = '#000';
+  for (let y = 0; y < H; y += 4) ctx.fillRect(0, y, W, 2);
+  ctx.restore();
+  const v = ctx.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, H * 0.95);
+  v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,0.6)');
+  ctx.fillStyle = v; ctx.fillRect(0, 0, W, H);
+}
+
+/* ---------- frame ---------- */
+const travelCache = new Map();
+function dist(t) {
+  const key = Math.round(t * 240);
+  if (!travelCache.has(key)) travelCache.set(key, travel(key / 240));
+  return travelCache.get(key);
+}
+
+function renderAt(t) {
+  const p = PALETTES[S.pal];
+  const L = layout();
+  const d = dist(t);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = 1;
+  ctx.clearRect(0, 0, W, H);
+  background(p, t);
+  gridFloor(p, t, d);
+  warp(p, t, d);
+
+  // outro zoom into the badge
+  const zk = easeInCubic(prog(t, 4.35, 4.95));
+  ctx.save();
+  if (zk > 0) {
+    const fx = L.badgeX, fy = L.cy;
+    ctx.translate(fx, fy); ctx.scale(1 + zk * 6, 1 + zk * 6); ctx.translate(-fx, -fy);
+  }
+  // camera shake on impacts
+  const shake = Math.exp(-Math.pow((t - 1.45) / 0.08, 2)) * 14 + Math.exp(-Math.pow((t - 2.5) / 0.15, 2)) * 5;
+  if (shake > 0.3) { const r = rng(Math.floor(t * 120)); ctx.translate((r() - .5) * shake, (r() - .5) * shake); }
+  snippets(p, t);
+  letterLayer(p, t, L);
+  underline(p, t, L);
+  tagline(p, t, L);
+  badgeLayer(p, t, L);
+  ctx.restore();
+
+  glitch(t);
+  scanlines();
+
+  // white flash on badge impact and at the end
+  const flash = Math.exp(-Math.pow((t - 1.42) / 0.05, 2)) * 0.55 + Math.exp(-Math.pow((t - 4.82) / 0.07, 2)) * 0.95;
+  if (flash > 0.01) { ctx.fillStyle = `rgba(255,255,255,${clamp(flash)})`; ctx.fillRect(0, 0, W, H); }
+  // fade from / to black
+  const fadeIn = 1 - prog(t, 0, 0.25);
+  const fadeOut = prog(t, 4.86, 5.0);
+  const blk = Math.max(fadeIn, fadeOut);
+  if (blk > 0) { ctx.fillStyle = `rgba(0,0,0,${blk})`; ctx.fillRect(0, 0, W, H); }
+}
+window.renderAt = renderAt;
+window.INTRO_DURATION = DUR;
+
+/* ---------- player UI ---------- */
+const $ = id => document.getElementById(id);
+const snd = $('snd');
+let playing = false, t0 = 0, cur = 3.6;
+function show(t) {
+  cur = t; renderAt(t);
+  $('seek').value = t.toFixed(2);
+  $('time').textContent = t.toFixed(2) + ' с';
+}
+function loop(now) {
+  if (!playing) return;
+  const t = (now - t0) / 1000;
+  if (t >= DUR) { playing = false; show(DUR); $('play').textContent = '▶ Играть'; onEnd && onEnd(); return; }
+  show(t);
+  requestAnimationFrame(loop);
+}
+let onEnd = null;
+function play() {
+  playing = true; $('play').textContent = '■ Стоп';
+  t0 = performance.now();
+  if ($('sound').checked && snd.readyState >= 2) { snd.currentTime = 0; snd.play().catch(() => {}); }
+  requestAnimationFrame(loop);
+}
+function stop() { playing = false; snd.pause(); $('play').textContent = '▶ Играть'; }
+$('play').onclick = () => playing ? stop() : play();
+$('seek').oninput = e => { stop(); show(+e.target.value); };
+$('name').oninput = e => { S.name = e.target.value; if (!playing) show(cur); };
+$('tag').oninput = e => { S.tag = e.target.value; if (!playing) show(cur); };
+PALETTES.forEach((p, i) => {
+  const b = document.createElement('button');
+  b.className = 'swatch';
+  b.style.background = `linear-gradient(135deg, ${p.a} 50%, ${p.b} 50%)`;
+  b.setAttribute('aria-label', 'Цвет ' + (i + 1));
+  b.setAttribute('aria-pressed', i === S.pal);
+  b.onclick = () => {
+    S.pal = i;
+    document.querySelectorAll('.swatch').forEach((s, j) => s.setAttribute('aria-pressed', j === i));
+    document.documentElement.style.setProperty('--accent', p.a);
+    if (!playing) show(cur);
+  };
+  $('colors').appendChild(b);
+});
+
+/* record in-browser (webm) */
+let actx = null, dest = null;
+$('rec').onclick = () => {
+  if (!window.MediaRecorder) { $('recHint').textContent = 'Браузер не умеет записывать видео. Попробуй Chrome.'; return; }
+  const stream = cv.captureStream(60);
+  if ($('sound').checked && snd.readyState >= 2) {
+    try {
+      if (!actx) {
+        actx = new AudioContext();
+        const src = actx.createMediaElementSource(snd);
+        dest = actx.createMediaStreamDestination();
+        src.connect(dest); src.connect(actx.destination);
+      }
+      dest.stream.getAudioTracks().forEach(tr => stream.addTrack(tr));
+    } catch (e) {}
+  }
+  const type = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm';
+  const rec = new MediaRecorder(stream, { mimeType: type, videoBitsPerSecond: 16e6 });
+  const chunks = [];
+  rec.ondataavailable = e => e.data.size && chunks.push(e.data);
+  rec.onstop = () => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob(chunks, { type: 'video/webm' }));
+    a.download = 'intro-' + (S.name.trim().toLowerCase() || 'channel') + '.webm';
+    a.click();
+    $('rec').disabled = false; $('rec').textContent = 'Записать видео (.webm)';
+  };
+  $('rec').disabled = true; $('rec').textContent = 'Записываю…';
+  onEnd = () => { onEnd = null; setTimeout(() => rec.stop(), 150); };
+  rec.start();
+  play();
+};
+
+show(cur);
+Promise.all([
+  document.fonts.load('900 168px "Unbounded"'),
+  document.fonts.load('800 54px "JetBrains Mono"'),
+  document.fonts.load('900 60px "JetBrains Mono"'),
+]).catch(() => {}).finally(() => { show(cur); window.__ready = true; });
+</script>
+</body>
+</html>
